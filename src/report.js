@@ -192,6 +192,7 @@ const nf = (v) => v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e4 ? (v / 1e3).t
 const tip = { trigger: "axis", backgroundColor: "#fff", borderColor: "#e8eaf3", textStyle: { color: "#1e2235", fontSize: 12 } };
 const grid = { left: 60, right: 24, top: 40, bottom: 76 };
 const axfmt = (v) => nf(v);
+const trunc = (s) => s.length > 22 ? s.slice(0, 10) + "…" + s.slice(-10) : s;
 
 const cards = [
   ["总 token", nf(S.totals.total), "tok"],
@@ -210,7 +211,7 @@ const models = Object.keys(S.byModel);
 chart("c1").setOption({
   color: PAL, tooltip: tip, legend: { bottom: 0, icon: "roundRect", itemWidth: 14, itemHeight: 8 },
   grid,
-  xAxis: { type: "category", data: models, axisLabel: { interval: 0, rotate: 24, fontSize: 11, color: "#8189a3" },
+  xAxis: { type: "category", data: models, axisLabel: { interval: 0, rotate: 24, fontSize: 11, color: "#8189a3", formatter: trunc },
            axisLine: { lineStyle: { color: "#e8eaf3" } } },
   yAxis: { type: "value", axisLabel: { formatter: axfmt, color: "#8189a3" }, splitLine: { lineStyle: { color: "#f0f2f8" } } },
   series: [
