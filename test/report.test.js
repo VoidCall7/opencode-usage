@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const {
-  readRecords, dedupe, localDate, loadPrices, estimateCost, aggregate,
+  readRecords, dedupe, localDate, loadPrices, estimateCost, resolveCost, aggregate,
   renderText, renderHtml,
 } = require("../src/report.js");
 
@@ -51,6 +51,15 @@ test("loadPrices 文件缺失返回空对象", () => {
 test("estimateCost 按每百万单价计算", () => {
   const c = estimateCost({ input: 1000000, output: 0, cacheRead: 0, cacheWrite: 0 }, { input: 2 });
   assert.equal(c, 2);
+});
+
+test("resolveCost：override / 自带 cost / 兜底估算 三档语义", () => {
+  const price = { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 };
+  const r = rec({ cost: 0.5 });
+  assert.ok(Math.abs(resolveCost(r, { ...price, override: true }) - 200 / 1e6) < 1e-12); // override 无视自带
+  assert.equal(resolveCost(r, price), 0.5); // 自带 cost>0 直接用
+  assert.ok(Math.abs(resolveCost(rec({ cost: 0 }), price) - 200 / 1e6) < 1e-12); // cost=0 兜底估算
+  assert.equal(resolveCost(rec({ cost: 0 }), undefined), 0); // 无价格无 cost 为 0
 });
 
 test("aggregate：total 只含四类，reasoning 不参与求和", () => {
@@ -107,9 +116,12 @@ test("renderText 含模型行、总计行与占比", () => {
 test("renderHtml 内嵌 echarts 与数据、无未替换占位符", () => {
   const echartsJs = fs.readFileSync(
     path.join(__dirname, "..", "src", "vendor", "echarts.min.js"), "utf8");
-  const html = renderHtml(aggregate([rec()], {}), echartsJs);
+  const s = aggregate([rec()], {});
+  s.records = [rec()]; // main() 会把带有效成本的记录嵌入页面供前端筛选
+  const html = renderHtml(s, echartsJs);
   assert.ok(html.includes("echarts"));
   assert.ok(html.includes("gpt-5.6-luna"));
+  assert.ok(html.includes('data-r="month"')); // 时间范围筛选器
   assert.ok(!html.includes("__DATA__"));
   assert.ok(html.startsWith("<!doctype html>"));
 });

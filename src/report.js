@@ -49,6 +49,15 @@ function estimateCost(tokens, price) {
   return sum / 1e6;
 }
 
+// 单条记录的有效成本：override 强制按价格表算；自带 cost>0 直接用；否则有价格条目则估算；否则 0
+function resolveCost(r, price) {
+  const t = r.tokens || {};
+  if (price && price.override) return estimateCost(t, price);
+  if ((r.cost || 0) > 0) return r.cost;
+  if (price) return estimateCost(t, price);
+  return r.cost || 0;
+}
+
 const emptyAcc = () => ({
   requests: 0, input: 0, output: 0, reasoning: 0,
   cacheRead: 0, cacheWrite: 0, total: 0, cost: 0,
@@ -63,9 +72,7 @@ function addRecord(acc, r, price) {
   acc.cacheRead += t.cacheRead || 0;
   acc.cacheWrite += t.cacheWrite || 0;
   acc.total += (t.input || 0) + (t.output || 0) + (t.cacheRead || 0) + (t.cacheWrite || 0);
-  if (price && price.override) acc.cost += estimateCost(t, price);
-  else if ((r.cost || 0) > 0) acc.cost += r.cost;
-  else if (price) acc.cost += estimateCost(t, price);
+  acc.cost += resolveCost(r, price);
 }
 
 function aggregate(records, prices) {
@@ -124,7 +131,7 @@ function renderText(summary) {
 }
 
 function renderHtml(summary, echartsJs) {
-  // 细分数据：reasoning 单独展示，不参与求和
+  // reasoning 是 output 的子集，不参与求和；records 已带有效成本（价格表兜底/override 在 Node 端解析完）
   const payload = JSON.stringify(summary).replace(/</g, "\\u003c");
   const generatedAt = new Date().toLocaleString("zh-CN", { hour12: false });
   return `<!doctype html>
@@ -138,11 +145,20 @@ function renderHtml(summary, echartsJs) {
   .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 24px 40px; }
   .hero { background: linear-gradient(130deg, #5b6cff, #8a5cff 55%, #c14bff); border-radius: 16px; color: #fff;
           padding: 24px 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
-          box-shadow: 0 10px 26px rgba(91,108,255,.28); margin-bottom: 20px; }
+          box-shadow: 0 10px 26px rgba(91,108,255,.28); }
   .hero h1 { margin: 0; font-size: 22px; letter-spacing: .5px; }
   .hero .sub { opacity: .85; font-size: 13px; margin-top: 6px; }
   .badge { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.4); padding: 6px 16px;
            border-radius: 999px; font-size: 13px; white-space: nowrap; }
+  .filterbar { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin: 16px 0 20px;
+               background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 18px;
+               position: sticky; top: 8px; z-index: 10; box-shadow: 0 4px 14px rgba(30,34,53,.08); }
+  .filterbar .flabel { font-size: 13px; color: var(--muted); font-weight: 600; }
+  .seg { display: inline-flex; background: #edeff8; border-radius: 999px; padding: 3px; }
+  .seg button { border: 0; background: transparent; padding: 5px 16px; border-radius: 999px; font-size: 13px;
+                cursor: pointer; color: var(--muted); font-family: inherit; }
+  .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.15); font-weight: 600; }
+  .seg button.on.pri { background: var(--accent); color: #fff; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
   .card { background: var(--card); border-radius: 14px; padding: 16px 18px; border: 1px solid var(--border);
           box-shadow: 0 1px 2px rgba(30,34,53,.05); transition: transform .15s, box-shadow .15s; }
@@ -154,32 +170,45 @@ function renderHtml(summary, echartsJs) {
   .card.inp .value { color: #3d7bfd; } .card.out .value { color: #e8590c; }
   .panel { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px 12px; margin-bottom: 20px;
            box-shadow: 0 1px 2px rgba(30,34,53,.05); }
-  .panel h3 { margin: 0; font-size: 15px; display: flex; align-items: center; justify-content: space-between; }
+  .panel h3 { margin: 0; font-size: 15px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
   .panel .desc { font-size: 12px; color: var(--muted); margin: 4px 0 6px; }
-  #c1,#c2,#c3 { width: 100%; height: 340px; }
-  .seg { display: inline-flex; background: #edeff8; border-radius: 999px; padding: 3px; }
-  .seg button { border: 0; background: transparent; padding: 5px 16px; border-radius: 999px; font-size: 13px;
-                cursor: pointer; color: var(--muted); font-family: inherit; }
-  .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.15); font-weight: 600; }
+  .row2 { display: flex; gap: 16px; flex-wrap: wrap; }
+  .row2 > div { flex: 1; min-width: 300px; height: 320px; }
+  #trend, #c3 { width: 100%; height: 340px; }
+  #empty { display: none; text-align: center; color: var(--muted); padding: 32px 0 12px; font-size: 14px; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
   th { color: var(--muted); font-weight: 600; text-align: right; padding: 10px 12px; border-bottom: 2px solid var(--border); white-space: nowrap; }
   td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   th:first-child, td:first-child { text-align: left; }
   tbody tr:hover { background: #f7f8ff; }
+  tr.totalrow { background: #f7f8ff; font-weight: 700; }
   .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #eef0ff; color: var(--accent); font-weight: 600; font-size: 12px; }
   footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 4px; }
 </style></head><body>
 <div class="wrap">
   <div class="hero">
     <div><h1>📊 OpenCode Token 用量报告</h1>
-      <div class="sub">按模型 · 按日期 · 按项目 | reasoning 为 output 子集，不计入总量</div></div>
+      <div class="sub">按模型 · 按项目 · 时间可筛选 | reasoning 为 output 子集，不计入总量</div></div>
     <div class="badge">${summary.range.from ? `${summary.range.from} ~ ${summary.range.to}` : "暂无数据"}</div>
   </div>
+  <div class="filterbar">
+    <span class="flabel">时间范围</span>
+    <span class="seg" id="segRange">
+      <button data-r="all" class="on pri">全部</button><button data-r="year">今年</button><button data-r="month">本月</button><button data-r="today">今日</button>
+    </span>
+    <span class="flabel" style="margin-left:auto">趋势粒度</span>
+    <span class="seg" id="segGran">
+      <button data-g="day">按日</button><button data-g="month" class="on">按月</button><button data-g="year">按年</button>
+    </span>
+    <span class="seg" id="segMetric">
+      <button data-m="token" class="on">token</button><button data-m="cost">cost</button>
+    </span>
+  </div>
+  <div id="empty">该时间范围内暂无数据</div>
   <div class="cards" id="cards"></div>
-  <div class="panel"><h3>按模型</h3><div class="desc">各类 token 堆叠（cache = read + write）</div><div id="c1"></div></div>
-  <div class="panel"><h3>按日期
-    <span class="seg"><button id="btnTok" class="on">token</button><button id="btnCost">cost</button></span></h3>
-    <div class="desc">每日用量趋势，可切换金额视图</div><div id="c2"></div></div>
+  <div class="panel"><h3>用量趋势</h3><div class="desc">按所选粒度聚合，token / cost 可切换</div><div id="trend"></div></div>
+  <div class="panel"><h3>模型分布</h3><div class="desc">左：各模型总 token 占比；右：用量排行</div>
+    <div class="row2"><div id="c1a"></div><div id="c1b"></div></div></div>
   <div class="panel"><h3>按项目</h3><div class="desc">各项目目录的总 token 对比</div><div id="c3"></div></div>
   <div class="panel"><h3>明细（按模型汇总）</h3><div style="overflow-x:auto"><table id="tbl"></table></div></div>
   <footer>生成时间 ${generatedAt} · 数据源 ~/.config/opencode/usage/data.jsonl${summary.bad > 0 ? ` · 已跳过坏行 ${summary.bad} 条` : ""}</footer>
@@ -187,81 +216,177 @@ function renderHtml(summary, echartsJs) {
 <script>${echartsJs}</script>
 <script>
 const S = ${payload};
-const PAL = ["#5b6cff", "#22c1a4", "#f6a723"];
+const R = S.records || [];
+const PAL = ["#5b6cff", "#22c1a4", "#f6a723", "#e8590c", "#9b59b6", "#00b8d4", "#ff7096"];
+const $ = (id) => document.getElementById(id);
 const nf = (v) => v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e4 ? (v / 1e3).toFixed(1) + "K" : (v || 0).toLocaleString();
+const money = (v) => "$" + (v || 0).toFixed(4);
 const tip = { trigger: "axis", backgroundColor: "#fff", borderColor: "#e8eaf3", textStyle: { color: "#1e2235", fontSize: 12 } };
-const grid = { left: 60, right: 24, top: 40, bottom: 76 };
-const axfmt = (v) => nf(v);
 const trunc = (s) => s.length > 22 ? s.slice(0, 10) + "…" + s.slice(-10) : s;
+const charts = {};
+const chart = (id) => charts[id] || (charts[id] = echarts.init($(id)));
 
-const cards = [
-  ["总 token", nf(S.totals.total), "tok"],
-  ["总 cost", "$" + S.totals.cost.toFixed(4), "cost"],
-  ["input 占比", S.totals.total ? (100 * S.totals.input / S.totals.total).toFixed(1) + "%" : "-", "inp"],
-  ["output 占比", S.totals.total ? (100 * S.totals.output / S.totals.total).toFixed(1) + "%" : "-", "out"],
-  ["cache read/write", '<small>' + nf(S.totals.cacheRead) + " / " + nf(S.totals.cacheWrite) + "</small>", ""],
-  ["请求次数", String(S.totals.requests), ""],
-  ["reasoning <small>(output 子集)</small>", nf(S.totals.reasoning), ""],
-];
-document.getElementById("cards").innerHTML = cards.map(([k, v, c]) =>
-  \`<div class="card \${c}"><div class="label">\${k}</div><div class="value">\${v}</div></div>\`).join("");
+let range = "all", gran = "month", metric = "token";
+const RANGE_GRAN = { all: "month", year: "month", month: "day", today: "day" };
 
-const chart = (id) => echarts.init(document.getElementById(id));
-const models = Object.keys(S.byModel);
-chart("c1").setOption({
-  color: PAL, tooltip: tip, legend: { bottom: 0, icon: "roundRect", itemWidth: 14, itemHeight: 8 },
-  grid,
-  xAxis: { type: "category", data: models, axisLabel: { interval: 0, rotate: 24, fontSize: 11, color: "#8189a3", formatter: trunc },
-           axisLine: { lineStyle: { color: "#e8eaf3" } } },
-  yAxis: { type: "value", axisLabel: { formatter: axfmt, color: "#8189a3" }, splitLine: { lineStyle: { color: "#f0f2f8" } } },
-  series: [
-    { name: "input", type: "bar", stack: "t", barMaxWidth: 46, itemStyle: { borderRadius: [0, 0, 0, 0] }, data: models.map((m) => S.byModel[m].input) },
-    { name: "output", type: "bar", stack: "t", barMaxWidth: 46, data: models.map((m) => S.byModel[m].output) },
-    { name: "cache", type: "bar", stack: "t", barMaxWidth: 46, itemStyle: { borderRadius: [6, 6, 0, 0] }, data: models.map((m) => S.byModel[m].cacheRead + S.byModel[m].cacheWrite) },
-  ],
-});
+function emptyT() { return { requests: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0, total: 0, cost: 0 }; }
+function addT(a, r) {
+  const t = r.tokens || {};
+  a.requests++;
+  a.input += t.input || 0; a.output += t.output || 0; a.reasoning += t.reasoning || 0;
+  a.cacheRead += t.cacheRead || 0; a.cacheWrite += t.cacheWrite || 0;
+  a.total += (t.input || 0) + (t.output || 0) + (t.cacheRead || 0) + (t.cacheWrite || 0);
+  a.cost += r.cost || 0;
+}
+function addAcc(dst, a) { // 合并聚合行（字段已是扁平值，不能再走 addT）
+  dst.requests += a.requests; dst.input += a.input; dst.output += a.output;
+  dst.reasoning += a.reasoning; dst.cacheRead += a.cacheRead; dst.cacheWrite += a.cacheWrite;
+  dst.total += a.total; dst.cost += a.cost;
+}
+function pad(n) { return String(n).padStart(2, "0"); }
+function bucket(ts, g) {
+  const d = new Date(ts);
+  if (g === "year") return String(d.getFullYear());
+  if (g === "month") return d.getFullYear() + "-" + pad(d.getMonth() + 1);
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+}
+function inRange(ts, rg) {
+  if (rg === "all") return true;
+  const d = new Date(ts), now = new Date();
+  if (rg === "today") return bucket(ts, "day") === bucket(now.getTime(), "day");
+  if (rg === "month") return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  return d.getFullYear() === now.getFullYear();
+}
+const modelKey = (r) => (r.providerID || "") + "/" + (r.modelID || "");
+function agg(rs) {
+  const t = emptyT(), byModel = {}, byDate = {}, byProject = {};
+  for (const r of rs) {
+    addT(t, r);
+    addT(byModel[modelKey(r)] = byModel[modelKey(r)] || emptyT(), r);
+    addT(byDate[bucket(r.time, gran)] = byDate[bucket(r.time, gran)] || emptyT(), r);
+    addT(byProject[r.projectPath || "(unknown)"] = byProject[r.projectPath || "(unknown)"] || emptyT(), r);
+  }
+  return { t, byModel, byDate, byProject };
+}
 
-const dates = Object.keys(S.byDate).sort();
-const c2 = chart("c2");
-function drawDate(mode) {
-  c2.setOption({
+function renderCards(t) {
+  const cards = [
+    ["总 token", nf(t.total), "tok"],
+    ["总 cost", money(t.cost), "cost"],
+    ["input 占比", t.total ? (100 * t.input / t.total).toFixed(1) + "%" : "-", "inp"],
+    ["output 占比", t.total ? (100 * t.output / t.total).toFixed(1) + "%" : "-", "out"],
+    ["cache read/write", '<small>' + nf(t.cacheRead) + " / " + nf(t.cacheWrite) + "</small>", ""],
+    ["请求次数", String(t.requests), ""],
+    ["reasoning <small>(output 子集)</small>", nf(t.reasoning), ""],
+  ];
+  $("cards").innerHTML = cards.map(([k, v, c]) =>
+    \`<div class="card \${c}"><div class="label">\${k}</div><div class="value">\${v}</div></div>\`).join("");
+}
+
+function renderTrend(byDate) {
+  const keys = Object.keys(byDate).sort();
+  const yv = (a) => metric === "cost" ? +a.cost.toFixed(6) : a.total;
+  const yax = { type: "value", axisLabel: { formatter: metric === "cost" ? ((v) => "$" + nf(v)) : nf, color: "#8189a3" },
+                splitLine: { lineStyle: { color: "#f0f2f8" } } };
+  chart("trend").setOption({
     color: PAL, tooltip: tip,
-    legend: mode === "cost" ? undefined : { bottom: 0, icon: "roundRect", itemWidth: 14, itemHeight: 8 },
-    grid,
-    xAxis: { type: "category", data: dates, axisLabel: { color: "#8189a3" }, axisLine: { lineStyle: { color: "#e8eaf3" } } },
-    yAxis: { type: "value", axisLabel: { formatter: mode === "cost" ? ((v) => "$" + nf(v)) : axfmt, color: "#8189a3" },
-             splitLine: { lineStyle: { color: "#f0f2f8" } } },
-    series: mode === "cost"
+    legend: metric === "cost" ? undefined : { bottom: 0, icon: "roundRect", itemWidth: 14, itemHeight: 8 },
+    grid: { left: 60, right: 24, top: 30, bottom: metric === "cost" ? 24 : 56 },
+    xAxis: { type: "category", data: keys, axisLabel: { color: "#8189a3" }, axisLine: { lineStyle: { color: "#e8eaf3" } } },
+    yAxis: yax,
+    series: metric === "cost"
       ? [{ name: "cost", type: "line", smooth: true, symbolSize: 7,
-           lineStyle: { width: 3, color: "#0ea572" }, itemStyle: { color: "#0ea572" }, areaStyle: { opacity: .12, color: "#0ea572" },
-           data: dates.map((d) => +S.byDate[d].cost.toFixed(6)) }]
+           lineStyle: { width: 3, color: "#0ea572" }, itemStyle: { color: "#0ea572" },
+           areaStyle: { opacity: .12, color: "#0ea572" }, data: keys.map((k) => yv(byDate[k])) }]
       : [
-          { name: "input", type: "bar", stack: "t", barMaxWidth: 36, data: dates.map((d) => S.byDate[d].input) },
-          { name: "output", type: "bar", stack: "t", barMaxWidth: 36, data: dates.map((d) => S.byDate[d].output) },
-          { name: "cache", type: "bar", stack: "t", barMaxWidth: 36, itemStyle: { borderRadius: [6, 6, 0, 0] }, data: dates.map((d) => S.byDate[d].cacheRead + S.byDate[d].cacheWrite) },
+          { name: "input", type: "bar", stack: "t", barMaxWidth: 36, data: keys.map((k) => byDate[k].input) },
+          { name: "output", type: "bar", stack: "t", barMaxWidth: 36, data: keys.map((k) => byDate[k].output) },
+          { name: "cache", type: "bar", stack: "t", barMaxWidth: 36, itemStyle: { borderRadius: [6, 6, 0, 0] },
+            data: keys.map((k) => byDate[k].cacheRead + byDate[k].cacheWrite) },
         ],
   }, true);
 }
-const btnTok = document.getElementById("btnTok"), btnCost = document.getElementById("btnCost");
-btnTok.onclick = () => { btnTok.classList.add("on"); btnCost.classList.remove("on"); drawDate("token"); };
-btnCost.onclick = () => { btnCost.classList.add("on"); btnTok.classList.remove("on"); drawDate("cost"); };
-drawDate("token");
 
-const projects = Object.keys(S.byProject);
-chart("c3").setOption({
-  color: ["#5b6cff"], tooltip: tip, grid: { left: 60, right: 60, top: 16, bottom: 24 },
-  xAxis: { type: "value", axisLabel: { formatter: axfmt, color: "#8189a3" }, splitLine: { lineStyle: { color: "#f0f2f8" } } },
-  yAxis: { type: "category", data: projects, axisLabel: { color: "#1e2235", fontSize: 12 }, axisLine: { lineStyle: { color: "#e8eaf3" } } },
-  series: [{ type: "bar", barMaxWidth: 22, itemStyle: { borderRadius: [0, 6, 6, 0] },
-             data: projects.map((p) => S.byProject[p].total) }],
-});
+function renderModels(byModel) {
+  const entries = Object.entries(byModel).sort((a, b) => b[1].total - a[1].total);
+  chart("c1a").setOption({
+    color: PAL,
+    tooltip: { trigger: "item", backgroundColor: "#fff", borderColor: "#e8eaf3", textStyle: { color: "#1e2235", fontSize: 12 },
+               formatter: (p) => p.name + "<br/>" + nf(p.value) + " (" + p.percent + "%)" },
+    legend: { bottom: 0, icon: "circle", itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11, color: "#8189a3" } },
+    series: [{ type: "pie", radius: ["42%", "68%"], center: ["50%", "44%"],
+               label: { formatter: "{d}%", fontSize: 11, color: "#8189a3" },
+               itemStyle: { borderColor: "#fff", borderWidth: 2 },
+               data: entries.map(([m, a]) => ({ name: trunc(m), value: a.total })) }],
+  }, true);
+  const names = entries.map(([m]) => trunc(m)).reverse();
+  const vals = entries.map(([, a]) => a.total).reverse();
+  chart("c1b").setOption({
+    color: ["#5b6cff"], tooltip: { ...tip, formatter: (p) => p.name + "<br/>total " + nf(p.value) },
+    grid: { left: 10, right: 80, top: 10, bottom: 10, containLabel: true },
+    xAxis: { type: "value", axisLabel: { formatter: nf, color: "#8189a3" }, splitLine: { lineStyle: { color: "#f0f2f8" } } },
+    yAxis: { type: "category", data: names, axisLabel: { color: "#1e2235", fontSize: 11 }, axisLine: { lineStyle: { color: "#e8eaf3" } } },
+    series: [{ type: "bar", barMaxWidth: 18, itemStyle: { borderRadius: [0, 6, 6, 0] },
+               label: { show: true, position: "right", formatter: (p) => nf(p.value), color: "#8189a3", fontSize: 11 },
+               data: vals }],
+  }, true);
+}
 
-document.getElementById("tbl").innerHTML =
-  "<thead><tr><th>模型</th><th>次数</th><th>input</th><th>output</th><th>reasoning</th><th>cache read</th><th>cache write</th><th>合计</th><th>cost</th><th>input%</th><th>output%</th></tr></thead><tbody>" +
-  models.map((m) => { const a = S.byModel[m];
-    return \`<tr><td><span class="pill">\${m}</span></td><td>\${a.requests}</td><td>\${a.input.toLocaleString()}</td><td>\${a.output.toLocaleString()}</td><td>\${a.reasoning.toLocaleString()}</td><td>\${a.cacheRead.toLocaleString()}</td><td>\${a.cacheWrite.toLocaleString()}</td><td><b>\${a.total.toLocaleString()}</b></td><td>$\${a.cost.toFixed(4)}</td><td>\${a.total ? (100 * a.input / a.total).toFixed(1) : 0}%</td><td>\${a.total ? (100 * a.output / a.total).toFixed(1) : 0}%</td></tr>\`; }).join("") +
-  "</tbody>";
-window.addEventListener("resize", () => { ["c1","c2","c3"].forEach((id) => chart(id).resize()); });
+function renderProjects(byProject) {
+  const entries = Object.entries(byProject).sort((a, b) => a[1].total - b[1].total);
+  chart("c3").setOption({
+    color: ["#5b6cff"], tooltip: { ...tip, formatter: (p) => p.name + "<br/>total " + nf(p.value) },
+    grid: { left: 60, right: 70, top: 16, bottom: 24 },
+    xAxis: { type: "value", axisLabel: { formatter: nf, color: "#8189a3" }, splitLine: { lineStyle: { color: "#f0f2f8" } } },
+    yAxis: { type: "category", data: entries.map(([p]) => trunc(p)), axisLabel: { color: "#1e2235", fontSize: 12 },
+             axisLine: { lineStyle: { color: "#e8eaf3" } } },
+    series: [{ type: "bar", barMaxWidth: 22, itemStyle: { borderRadius: [0, 6, 6, 0] },
+               label: { show: true, position: "right", formatter: (p) => nf(p.value), color: "#8189a3", fontSize: 11 },
+               data: entries.map(([, a]) => a.total) }],
+  }, true);
+}
+
+function renderTable(byModel) {
+  const entries = Object.entries(byModel);
+  const row = (m, a, cls) =>
+    \`<tr\${cls ? ' class="' + cls + '"' : ""}><td>\${m ? '<span class="pill">' + m + "</span>" : "TOTAL"}</td>\` +
+    \`<td>\${a.requests}</td><td>\${a.input.toLocaleString()}</td><td>\${a.output.toLocaleString()}</td>\` +
+    \`<td>\${a.reasoning.toLocaleString()}</td><td>\${a.cacheRead.toLocaleString()}</td><td>\${a.cacheWrite.toLocaleString()}</td>\` +
+    \`<td><b>\${a.total.toLocaleString()}</b></td><td>\${money(a.cost)}</td>\` +
+    \`<td>\${a.total ? (100 * a.input / a.total).toFixed(1) : 0}%</td><td>\${a.total ? (100 * a.output / a.total).toFixed(1) : 0}%</td></tr>\`;
+  const t = emptyT(); entries.forEach(([, a]) => addAcc(t, a));
+  $("tbl").innerHTML =
+    "<thead><tr><th>模型</th><th>次数</th><th>input</th><th>output</th><th>reasoning</th><th>cache read</th><th>cache write</th><th>合计</th><th>cost</th><th>input%</th><th>output%</th></tr></thead><tbody>" +
+    entries.map(([m, a]) => row(m, a)).join("") + row(null, t, "totalrow") + "</tbody>";
+}
+
+function refresh() {
+  const rs = R.filter((r) => inRange(r.time, range));
+  const { t, byModel, byDate, byProject } = agg(rs);
+  $("empty").style.display = rs.length ? "none" : "block";
+  renderCards(t);
+  renderTrend(byDate);
+  renderModels(byModel);
+  renderProjects(byProject);
+  renderTable(byModel);
+}
+
+function bindSeg(id, attr, fn) {
+  $(id).addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    $(id).querySelectorAll("button").forEach((b) => b.classList.remove("on"));
+    btn.classList.add("on");
+    fn(btn.dataset[attr]);
+  });
+}
+bindSeg("segRange", "r", (v) => { range = v; gran = RANGE_GRAN[v];
+  $("segGran").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.g === gran));
+  refresh(); });
+bindSeg("segGran", "g", (v) => { gran = v; refresh(); });
+bindSeg("segMetric", "m", (v) => { metric = v; refresh(); });
+window.addEventListener("resize", () => Object.values(charts).forEach((c) => c.resize()));
+refresh();
 </script></body></html>`;
 }
 
@@ -299,8 +424,15 @@ function main(argv = []) {
   const pricesFile = opts.prices || path.join(usageDir, "prices.json");
 
   const { records, bad } = readRecords(dataFile);
-  const summary = aggregate(dedupe(records), loadPrices(pricesFile));
+  const prices = loadPrices(pricesFile);
+  // 每条记录预解析有效成本（价格表兜底 / override），整份嵌入 HTML 供浏览器本地筛选聚合
+  const enriched = dedupe(records).map((r) => ({
+    ...r,
+    cost: resolveCost(r, prices[`${r.providerID || ""}/${r.modelID || ""}`]),
+  }));
+  const summary = aggregate(enriched, {});
   summary.bad = bad;
+  summary.records = enriched;
 
   const text = renderText(summary);
   console.log(text);
@@ -322,6 +454,6 @@ function main(argv = []) {
 if (require.main === module) main(process.argv.slice(2));
 
 module.exports = {
-  readRecords, dedupe, localDate, loadPrices, estimateCost, aggregate,
+  readRecords, dedupe, localDate, loadPrices, estimateCost, resolveCost, aggregate,
   renderText, renderHtml, openBrowser, parseArgs, main,
 };
