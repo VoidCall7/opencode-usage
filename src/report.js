@@ -207,6 +207,7 @@ function renderHtml(summary, echartsJs) {
   .strip .nm { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .strip .val { margin-left: auto; color: var(--mut); white-space: nowrap; }
   .strip .pc { color: var(--dim); width: 52px; text-align: right; white-space: nowrap; }
+  .strip.hl { border-color: var(--acc); background: #201302; }
   #empty { display: none; color: var(--dim); padding: 40px 0 8px; font-size: 13px; text-align: center; }
   table { width: 100%; border-collapse: separate; border-spacing: 0 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
   th { color: var(--dim); font-weight: 400; text-transform: uppercase; font-size: 10px; letter-spacing: 1px;
@@ -255,7 +256,7 @@ function renderHtml(summary, echartsJs) {
   <div id="empty">该时间范围内暂无数据</div>
   <div class="stats" id="cards"></div>
 </div></section>
-<section><div class="wrap"><h2 class="sec-h">用量趋势<span>各模型用量占比堆叠（前 8 + 其他）· 点击图例隐藏模型 · TOKEN / COST 可切换</span></h2><div id="trend" style="height:340px"></div></div></section>
+<section><div class="wrap"><h2 class="sec-h">用量趋势<span>各模型用量占比堆叠（前 8 + 其他）· 悬停看单日明细 · 点击图例隐藏模型 · TOKEN / COST 可切换</span></h2><div id="trend" style="height:340px"></div></div></section>
 <section><div class="wrap"><h2 class="sec-h">模型分布<span>构成与用量排行</span></h2>
   <div class="strips" id="dist"></div><div id="rank"></div></div></section>
 <section><div class="wrap"><h2 class="sec-h">按项目<span>各项目目录的总 token 对比</span></h2><div id="c3"></div></div></section>
@@ -350,6 +351,16 @@ function setChart(id, opt, h) {
   charts[id].setOption(opt);
 }
 
+/* 模型 ↔ 趋势图 交叉高亮：悬停构成条高亮图中该模型，悬停图中分段反向点亮构成条 */
+function markStrip(name) {
+  document.querySelectorAll("#dist .strip").forEach((el) =>
+    el.classList.toggle("hl", !!name && el.dataset.model === name));
+}
+function hlTrend(name, on) {
+  if (!charts.trend) return;
+  charts.trend.dispatchAction({ type: on ? "highlight" : "downplay", seriesName: name });
+}
+
 function renderTrend(byDate, byDateModel, byModel) {
   // 与参考页一致：柱内按模型堆叠（占比），前 8 + 其他；颜色与构成条/排行/明细一致；点击图例可隐藏模型
   const keys = Object.keys(byDate).sort();
@@ -377,6 +388,7 @@ function renderTrend(byDate, byDateModel, byModel) {
   });
   setChart("trend", {
     tooltip: { trigger: "axis", backgroundColor: "#1a1a1a", borderColor: "#333", textStyle: { color: "#eee", fontSize: 12 },
+      axisPointer: { type: "shadow", shadowStyle: { color: "rgba(255,255,255,.06)" } }, // 悬停整列高亮色带
       formatter: (ps) => {
         const rows = ps.filter((p) => p.seriesName !== "__total" && p.value > 0).sort((a, b) => b.value - a.value);
         let tot = 0; rows.forEach((p) => { tot += p.value; });
@@ -396,6 +408,8 @@ function renderTrend(byDate, byDateModel, byModel) {
              splitLine: { lineStyle: { color: SPLIT } } },
     series,
   });
+  charts.trend.on("mouseover", (p) => markStrip(p.seriesName));
+  charts.trend.on("globalout", () => markStrip(null));
 }
 
 function renderModels(byModel) {
@@ -404,10 +418,15 @@ function renderModels(byModel) {
   const total = entries.reduce((s, [, a]) => s + a.total, 0);
   $("dist").innerHTML = entries.map(([m, a], i) => {
     const c = PAL[i % PAL.length];
-    return '<div class="strip"><span class="rk">' + pad(i + 1) + '</span><span class="sw" style="background:' + c + '"></span>' +
-      '<span class="nm" title="' + m + '">' + m + '</span><span class="val">' + nf(a.total) + '</span>' +
+    const attr = m.replace(/"/g, "&quot;");
+    return '<div class="strip" data-model="' + attr + '"><span class="rk">' + pad(i + 1) + '</span><span class="sw" style="background:' + c + '"></span>' +
+      '<span class="nm" title="' + attr + '">' + m + '</span><span class="val">' + nf(a.total) + '</span>' +
       '<span class="pc">' + (total ? (100 * a.total / total).toFixed(1) : "0.0") + "%</span></div>";
   }).join("");
+  $("dist").querySelectorAll(".strip").forEach((el) => {
+    el.addEventListener("mouseenter", () => { el.classList.add("hl"); hlTrend(el.dataset.model, true); });
+    el.addEventListener("mouseleave", () => { el.classList.remove("hl"); hlTrend(el.dataset.model, false); });
+  });
   const names = entries.map(([m]) => trunc(m)).reverse();
   const vals = entries.map(([, a]) => a.total).reverse();
   const cols = entries.map((_, i) => PAL[i % PAL.length]).reverse();
