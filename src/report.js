@@ -139,106 +139,141 @@ function renderHtml(summary, echartsJs) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OpenCode Token 用量报告</title>
 <style>
-  :root { --bg:#f3f5fb; --card:#fff; --ink:#1e2235; --muted:#8189a3; --border:#e8eaf3; --accent:#5b6cff; }
+  :root { --bg:#0d0d0d; --panel:#141414; --row:#181818; --line:#262626; --ink:#f2f2f2; --mut:#8f8f8f; --dim:#5c5c5c; --acc:#ff6a00; }
   * { box-sizing: border-box; }
-  body { font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; background: var(--bg); color: var(--ink); margin: 0; }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 24px 40px; }
-  .hero { background: linear-gradient(130deg, #5b6cff, #8a5cff 55%, #c14bff); border-radius: 16px; color: #fff;
-          padding: 24px 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
-          box-shadow: 0 10px 26px rgba(91,108,255,.28); }
-  .hero h1 { margin: 0; font-size: 22px; letter-spacing: .5px; }
-  .hero .sub { opacity: .85; font-size: 13px; margin-top: 6px; }
-  .badge { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.4); padding: 6px 16px;
-           border-radius: 999px; font-size: 13px; white-space: nowrap; }
-  .filterbar { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin: 16px 0 20px;
-               background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 18px;
-               position: sticky; top: 8px; z-index: 10; box-shadow: 0 4px 14px rgba(30,34,53,.08); }
-  .filterbar .flabel { font-size: 13px; color: var(--muted); font-weight: 600; }
-  .seg { display: inline-flex; background: #edeff8; border-radius: 999px; padding: 3px; }
-  .seg button { border: 0; background: transparent; padding: 5px 16px; border-radius: 999px; font-size: 13px;
-                cursor: pointer; color: var(--muted); font-family: inherit; }
-  .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.15); font-weight: 600; }
-  .seg button.on.pri { background: var(--accent); color: #fff; }
-  #customBox { display: none; align-items: center; gap: 8px; }
-  #customBox.show { display: inline-flex; }
-  #customBox input[type="date"] { border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; font-size: 13px;
-                                   font-family: inherit; color: var(--ink); background: #fff; }
-  #customBox .applybtn { border: 0; background: var(--accent); color: #fff; padding: 6px 16px; border-radius: 999px;
-                         font-size: 13px; cursor: pointer; font-family: inherit; font-weight: 600; }
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
-  .card { background: var(--card); border-radius: 14px; padding: 16px 18px; border: 1px solid var(--border);
-          box-shadow: 0 1px 2px rgba(30,34,53,.05); transition: transform .15s, box-shadow .15s; }
-  .card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(30,34,53,.08); }
-  .card .label { font-size: 12px; color: var(--muted); }
-  .card .value { font-size: 22px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
-  .card .value small { font-size: 12px; font-weight: 400; color: var(--muted); }
-  .card.tok .value { color: var(--accent); } .card.cost .value { color: #0ea572; }
-  .card.inp .value { color: #3d7bfd; } .card.out .value { color: #e8590c; }
-  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px 12px; margin-bottom: 20px;
-           box-shadow: 0 1px 2px rgba(30,34,53,.05); }
-  .panel h3 { margin: 0; font-size: 15px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-  .panel .desc { font-size: 12px; color: var(--muted); margin: 4px 0 6px; }
-  .row2 { display: flex; gap: 16px; flex-wrap: wrap; }
-  .row2 > div { flex: 1; min-width: 300px; height: 320px; }
-  #trend, #c3 { width: 100%; height: 340px; }
-  #empty { display: none; text-align: center; color: var(--muted); padding: 32px 0 12px; font-size: 14px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
-  th { color: var(--muted); font-weight: 600; text-align: right; padding: 10px 12px; border-bottom: 2px solid var(--border); white-space: nowrap; }
-  td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  body { font-family: ui-monospace, "Cascadia Code", Consolas, "Courier New", "Microsoft YaHei", monospace;
+         background: var(--bg); color: var(--ink); margin: 0; }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  .topbar { position: sticky; top: 0; z-index: 30; background: rgba(13,13,13,.94); backdrop-filter: blur(6px);
+            border-bottom: 1px solid var(--line); padding: 13px 32px; display: flex; justify-content: space-between; align-items: center; }
+  .logo { font-size: 13px; font-weight: 700; letter-spacing: 2px; }
+  .logo::before { content: "■ "; color: var(--acc); }
+  .topbar .gen { color: var(--dim); font-size: 11px; letter-spacing: 1px; }
+  .hero { border-bottom: 1px solid var(--line); padding: 60px 32px 72px;
+          background-image: radial-gradient(#1c1c1c 1px, transparent 1px); background-size: 14px 14px; }
+  .hero .upd { display: inline-block; border: 1px solid var(--line); background: #151515; color: var(--mut);
+               font-size: 11px; padding: 4px 12px; margin-bottom: 22px; }
+  .hero h1 { margin: 0 0 14px; font-size: 46px; letter-spacing: -1px; line-height: 1.1; }
+  .hero h1 span { color: var(--acc); }
+  .hero p { color: var(--mut); font-size: 13px; max-width: 620px; margin: 0; line-height: 1.8; }
+  .toolbar { position: sticky; top: 47px; z-index: 25; background: #101010; border-bottom: 1px solid var(--line); padding: 10px 32px; }
+  .tin { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .chip { border: 1px solid var(--line); background: transparent; color: var(--mut); font: inherit; font-size: 12px;
+          padding: 5px 13px; cursor: pointer; white-space: nowrap; }
+  .chip:hover { color: var(--ink); border-color: #454545; }
+  .chip.on { background: var(--acc); border-color: var(--acc); color: #000; font-weight: 700; }
+  .tin .sp { flex: 1; }
+  .grp { display: flex; align-items: center; gap: 6px; }
+  .grp .lb { color: var(--dim); font-size: 10px; letter-spacing: 1px; }
+  .dates { position: relative; display: flex; align-items: center; gap: 6px; }
+  .dates input { width: 108px; background: #161616; border: 1px solid var(--line); color: var(--ink);
+                 font: inherit; font-size: 12px; padding: 5px 8px; }
+  .dates input:focus { outline: none; border-color: var(--acc); }
+  .dates input::placeholder { color: var(--dim); }
+  .chip.go { color: var(--ink); }
+  .cal { position: absolute; top: calc(100% + 8px); left: 0; width: 256px; background: #161616;
+         border: 1px solid #2e2e2e; box-shadow: 0 14px 36px rgba(0,0,0,.65); padding: 12px; z-index: 60; display: none; }
+  .cal.show { display: block; }
+  .cal .calq { display: flex; flex-wrap: wrap; gap: 4px; padding-bottom: 10px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+  .cal .calq .chip { font-size: 11px; padding: 3px 9px; }
+  .cal .calh { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .cal .calh b { font-size: 13px; }
+  .cal .nav { border: 0; background: transparent; color: var(--mut); font: inherit; cursor: pointer; padding: 2px 8px; }
+  .cal .nav:hover { color: var(--acc); }
+  .cal .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .cal .wd { color: var(--dim); font-size: 10px; text-align: center; padding: 4px 0; }
+  .cal .day { border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12px; padding: 5px 0; cursor: pointer; }
+  .cal .day:hover { background: #262626; }
+  .cal .day.out { color: #3f3f3f; }
+  .cal .day.mid { background: #38200a; color: #ffb066; }
+  .cal .day.sel { background: var(--acc); color: #000; font-weight: 700; }
+  section { border-bottom: 1px solid var(--line); padding: 42px 32px 52px; }
+  .sec-h { margin: 0 0 8px; font-size: 24px; letter-spacing: -.5px; }
+  .sec-h span { color: var(--mut); font-size: 14px; font-weight: 400; margin-left: 10px; }
+  .sec-d { color: var(--dim); font-size: 12px; margin: 0 0 26px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px;
+           background: var(--line); border: 1px solid var(--line); }
+  .stat { background: #111; padding: 18px 20px; }
+  .stat .k { color: var(--dim); font-size: 10px; letter-spacing: 1.5px; }
+  .stat .v { font-size: 22px; font-weight: 700; margin-top: 10px; font-variant-numeric: tabular-nums; }
+  .stat.a .v { color: var(--acc); } .stat.g .v { color: #4ade80; } .stat.c .v { color: #22d3ee; }
+  .stat.o .v { color: #ff9f1c; } .stat.p .v { color: #e879f9; }
+  .stat .v small { font-size: 11px; font-weight: 400; color: var(--mut); }
+  .strips { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; margin-bottom: 24px; }
+  .strip { display: flex; align-items: center; gap: 10px; background: #161616; border: 1px solid #222;
+           padding: 9px 14px; font-size: 12px; min-width: 0; }
+  .strip .rk { color: var(--dim); }
+  .strip .sw { width: 8px; height: 8px; flex: none; }
+  .strip .nm { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .strip .val { margin-left: auto; color: var(--mut); white-space: nowrap; }
+  .strip .pc { color: var(--dim); width: 52px; text-align: right; white-space: nowrap; }
+  #empty { display: none; color: var(--dim); padding: 40px 0 8px; font-size: 13px; text-align: center; }
+  table { width: 100%; border-collapse: separate; border-spacing: 0 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
+  th { color: var(--dim); font-weight: 400; text-transform: uppercase; font-size: 10px; letter-spacing: 1px;
+       text-align: right; padding: 0 14px 4px; white-space: nowrap; }
+  td { background: #161616; text-align: right; padding: 10px 14px; white-space: nowrap; }
+  td:first-child { border-radius: 4px 0 0 4px; } td:last-child { border-radius: 0 4px 4px 0; }
   th:first-child, td:first-child { text-align: left; }
-  tbody tr:hover { background: #f7f8ff; }
-  tr.totalrow { background: #f7f8ff; font-weight: 700; }
-  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #eef0ff; color: var(--accent); font-weight: 600; font-size: 12px; }
-  footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 4px; }
+  tbody tr:hover td { background: #1f1f1f; }
+  tr.total td { background: #201302; font-weight: 700; }
+  tr.total td:first-child { border-left: 2px solid var(--acc); color: var(--acc); }
+  .mdot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; vertical-align: baseline; }
+  footer { color: var(--dim); font-size: 11px; letter-spacing: .5px; padding: 26px 32px 40px; }
+  @media (max-width: 720px) { .hero h1 { font-size: 30px; } .topbar, .toolbar, section, footer { padding-left: 16px; padding-right: 16px; } }
 </style></head><body>
-<div class="wrap">
-  <div class="hero">
-    <div><h1>📊 OpenCode Token 用量报告</h1>
-      <div class="sub">按模型 · 按项目 · 时间可筛选 | reasoning 为 output 子集，不计入总量</div></div>
-    <div class="badge">${summary.range.from ? `${summary.range.from} ~ ${summary.range.to}` : "暂无数据"}</div>
-  </div>
-  <div class="filterbar">
-    <span class="flabel">时间范围</span>
-    <span class="seg" id="segRange">
-      <button data-r="all" class="on pri">全部</button><button data-r="year">今年</button><button data-r="month">本月</button><button data-r="today">今日</button><button data-r="custom">自定义</button>
-    </span>
-    <span id="customBox">
-      <input type="date" id="dFrom"><span class="flabel">至</span><input type="date" id="dTo">
-      <button id="applyCustom" class="applybtn">应用</button>
-    </span>
-    <span class="flabel" style="margin-left:auto">趋势粒度</span>
-    <span class="seg" id="segGran">
-      <button data-g="day">按日</button><button data-g="month" class="on">按月</button><button data-g="year">按年</button>
-    </span>
-    <span class="seg" id="segMetric">
-      <button data-m="token" class="on">token</button><button data-m="cost">cost</button>
-    </span>
-  </div>
+<div class="topbar"><div class="logo">OPENCODE · USAGE</div><div class="gen">GENERATED ${generatedAt}</div></div>
+<div class="hero"><div class="wrap">
+  <div class="upd">[*] 已更新 ${generatedAt}</div>
+  <h1>Token 用量报告<span>.</span></h1>
+  <p>本地 OpenCode 的真实 token 消耗与成本，按模型、按项目、按时间统计。reasoning 为 output 子集，不计入总量；无价格数据时成本可能为 0。</p>
+</div></div>
+<div class="toolbar"><div class="tin">
+  <span class="grp" id="segRange">
+    <button class="chip" data-q="all">全部</button><button class="chip" data-q="today">今天</button><button class="chip" data-q="yesterday">昨天</button><button class="chip" data-q="month">本月</button><button class="chip" data-q="lastmonth">上个月</button><button class="chip" data-q="quarter">本季度</button>
+  </span>
+  <span class="dates" id="datesBox">
+    <input id="dFrom" placeholder="起始日期" autocomplete="off"><span style="color:var(--dim)">→</span><input id="dTo" placeholder="结束日期" autocomplete="off">
+    <button id="applyCustom" class="chip go">应用</button>
+    <div class="cal" id="calPanel">
+      <div class="calq">
+        <button class="chip" data-q="today">今天</button><button class="chip" data-q="yesterday">昨天</button><button class="chip" data-q="month">本月</button><button class="chip" data-q="lastmonth">上个月</button><button class="chip" data-q="quarter">本季度</button><button class="chip" data-q="all">全部</button>
+      </div>
+      <div class="calh"><button class="nav" id="calPrev">‹</button><b id="calTitle"></b><button class="nav" id="calNext">›</button></div>
+      <div class="grid" id="calWd"><span class="wd">一</span><span class="wd">二</span><span class="wd">三</span><span class="wd">四</span><span class="wd">五</span><span class="wd">六</span><span class="wd">日</span></div>
+      <div class="grid" id="calGrid"></div>
+    </div>
+  </span>
+  <span class="sp"></span>
+  <span class="grp"><span class="lb">粒度</span>
+    <span class="grp" id="segGran"><button class="chip" data-g="day">日</button><button class="chip" data-g="month">月</button><button class="chip" data-g="year">年</button></span>
+  </span>
+  <span class="grp"><span class="lb">指标</span>
+    <span class="grp" id="segMetric"><button class="chip" data-m="token">TOKEN</button><button class="chip" data-m="cost">COST</button></span>
+  </span>
+</div></div>
+<section><div class="wrap">
   <div id="empty">该时间范围内暂无数据</div>
-  <div class="cards" id="cards"></div>
-  <div class="panel"><h3>用量趋势</h3><div class="desc">按所选粒度聚合，token / cost 可切换</div><div id="trend"></div></div>
-  <div class="panel"><h3>模型分布</h3><div class="desc">左：各模型总 token 占比；右：用量排行</div>
-    <div class="row2"><div id="c1a"></div><div id="c1b"></div></div></div>
-  <div class="panel"><h3>按项目</h3><div class="desc">各项目目录的总 token 对比</div><div id="c3"></div></div>
-  <div class="panel"><h3>明细（按模型汇总）</h3><div style="overflow-x:auto"><table id="tbl"></table></div></div>
-  <footer>生成时间 ${generatedAt} · 数据源 ~/.config/opencode/usage/data.jsonl${summary.bad > 0 ? ` · 已跳过坏行 ${summary.bad} 条` : ""}</footer>
-</div>
+  <div class="stats" id="cards"></div>
+</div></section>
+<section><div class="wrap"><h2 class="sec-h">用量趋势<span>按所选粒度聚合，TOKEN / COST 可切换</span></h2><div id="trend" style="height:340px"></div></div></section>
+<section><div class="wrap"><h2 class="sec-h">模型分布<span>构成与用量排行</span></h2>
+  <div class="strips" id="dist"></div><div id="rank"></div></div></section>
+<section><div class="wrap"><h2 class="sec-h">按项目<span>各项目目录的总 token 对比</span></h2><div id="c3"></div></div></section>
+<section><div class="wrap"><h2 class="sec-h">明细<span>按模型汇总</span></h2><div style="overflow-x:auto"><table id="tbl"></table></div></div></section>
+<footer>[*] 生成时间 ${generatedAt} · 数据源 ~/.config/opencode/usage/data.jsonl${summary.bad > 0 ? ` · 已跳过坏行 ${summary.bad} 条` : ""}</footer>
 <script>${echartsJs}</script>
 <script>
 const S = ${payload};
 const R = S.records || [];
-const PAL = ["#5b6cff", "#22c1a4", "#f6a723", "#e8590c", "#9b59b6", "#00b8d4", "#ff7096"];
+const PAL = ["#ff9f1c", "#e879f9", "#a78bfa", "#22d3ee", "#4ade80", "#f43f5e", "#facc15", "#60a5fa", "#2dd4bf", "#fb7185"];
+const INK = "#f2f2f2", MUT = "#8f8f8f", DIM = "#5c5c5c", LINE = "#262626", SPLIT = "#1c1c1c", ACC = "#ff6a00";
 const $ = (id) => document.getElementById(id);
-const nf = (v) => v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e4 ? (v / 1e3).toFixed(1) + "K" : (v || 0).toLocaleString();
+const nf = (v) => v >= 1e9 ? (v / 1e9).toFixed(2) + "B" : v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e4 ? (v / 1e3).toFixed(1) + "K" : (v || 0).toLocaleString();
 const money = (v) => "$" + (v || 0).toFixed(4);
-const tip = { trigger: "axis", backgroundColor: "#fff", borderColor: "#e8eaf3", textStyle: { color: "#1e2235", fontSize: 12 } };
-const trunc = (s) => s.length > 22 ? s.slice(0, 10) + "…" + s.slice(-10) : s;
+const tip = { trigger: "axis", backgroundColor: "#1a1a1a", borderColor: "#333", textStyle: { color: "#eee", fontSize: 12 } };
+const trunc = (s) => s.length > 24 ? s.slice(0, 11) + "…" + s.slice(-11) : s;
+let from = null, to = null, gran = "month", metric = "token"; // from/to 为本地时间毫秒边界
 const charts = {};
-const chart = (id) => charts[id] || (charts[id] = echarts.init($(id)));
-
-let range = "all", gran = "month", metric = "token";
-let customFrom = null, customTo = null; // 自定义区间的本地时间边界（毫秒）
-const RANGE_GRAN = { all: "month", year: "month", month: "day", today: "day" };
 
 function emptyT() { return { requests: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0, total: 0, cost: 0 }; }
 function addT(a, r) {
@@ -249,7 +284,7 @@ function addT(a, r) {
   a.total += (t.input || 0) + (t.output || 0) + (t.cacheRead || 0) + (t.cacheWrite || 0);
   a.cost += r.cost || 0;
 }
-function addAcc(dst, a) { // 合并聚合行（字段已是扁平值，不能再走 addT）
+function addAcc(dst, a) {
   dst.requests += a.requests; dst.input += a.input; dst.output += a.output;
   dst.reasoning += a.reasoning; dst.cacheRead += a.cacheRead; dst.cacheWrite += a.cacheWrite;
   dst.total += a.total; dst.cost += a.cost;
@@ -261,17 +296,22 @@ function bucket(ts, g) {
   if (g === "month") return d.getFullYear() + "-" + pad(d.getMonth() + 1);
   return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
 }
-function inRange(ts, rg) {
-  if (rg === "custom") {
-    if (customFrom !== null && ts < customFrom) return false;
-    if (customTo !== null && ts > customTo) return false;
-    return true;
-  }
-  if (rg === "all") return true;
-  const d = new Date(ts), now = new Date();
-  if (rg === "today") return bucket(ts, "day") === bucket(now.getTime(), "day");
-  if (rg === "month") return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-  return d.getFullYear() === now.getFullYear();
+const day0 = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const fmtD = (ts) => bucket(ts, "day");
+function presetSpan(q) {
+  const n = new Date();
+  if (q === "today") return [+day0(n), +day0(n) + 864e5 - 1];
+  if (q === "yesterday") { const e = +day0(n); return [e - 864e5, e - 1]; }
+  if (q === "month") return [+new Date(n.getFullYear(), n.getMonth(), 1), +new Date(n.getFullYear(), n.getMonth() + 1, 1) - 1];
+  if (q === "lastmonth") return [+new Date(n.getFullYear(), n.getMonth() - 1, 1), +new Date(n.getFullYear(), n.getMonth(), 1) - 1];
+  if (q === "quarter") { const qs = Math.floor(n.getMonth() / 3) * 3;
+    return [+new Date(n.getFullYear(), qs, 1), +new Date(n.getFullYear(), qs + 3, 1) - 1]; }
+  return [null, null];
+}
+function inRange(ts) {
+  if (from !== null && ts < from) return false;
+  if (to !== null && ts > to) return false;
+  return true;
 }
 const modelKey = (r) => (r.providerID || "") + "/" + (r.modelID || "");
 function agg(rs) {
@@ -285,108 +325,145 @@ function agg(rs) {
   return { t, byModel, byDate, byProject };
 }
 
-function renderCards(t) {
+function renderStats(t) {
   const cards = [
-    ["总 token", nf(t.total), "tok"],
-    ["总 cost", money(t.cost), "cost"],
-    ["input 占比", t.total ? (100 * t.input / t.total).toFixed(1) + "%" : "-", "inp"],
-    ["output 占比", t.total ? (100 * t.output / t.total).toFixed(1) + "%" : "-", "out"],
-    ["cache read/write", '<small>' + nf(t.cacheRead) + " / " + nf(t.cacheWrite) + "</small>", ""],
+    ["TOTAL TOKEN", nf(t.total), "a"],
+    ["TOTAL COST", money(t.cost), "g"],
+    ["INPUT", nf(t.input) + ' <small>' + (t.total ? (100 * t.input / t.total).toFixed(1) + "%" : "-") + "</small>", "c"],
+    ["OUTPUT", nf(t.output) + ' <small>' + (t.total ? (100 * t.output / t.total).toFixed(1) + "%" : "-") + "</small>", "o"],
+    ["CACHE R/W", '<small>' + nf(t.cacheRead) + " / " + nf(t.cacheWrite) + "</small>", "p"],
     ["请求次数", String(t.requests), ""],
-    ["reasoning <small>(output 子集)</small>", nf(t.reasoning), ""],
+    ["REASONING", '<small>output 子集</small> ' + nf(t.reasoning), ""],
   ];
   $("cards").innerHTML = cards.map(([k, v, c]) =>
-    \`<div class="card \${c}"><div class="label">\${k}</div><div class="value">\${v}</div></div>\`).join("");
+    '<div class="stat ' + c + '"><div class="k">' + k + '</div><div class="v">' + v + "</div></div>").join("");
+}
+
+function setChart(id, opt, h) {
+  if (h) $(id).style.height = h + "px";
+  if (charts[id]) charts[id].dispose();
+  charts[id] = echarts.init($(id));
+  charts[id].setOption(opt);
 }
 
 function renderTrend(byDate) {
   const keys = Object.keys(byDate).sort();
   const yv = (a) => metric === "cost" ? +a.cost.toFixed(6) : a.total;
-  const yax = { type: "value", axisLabel: { formatter: metric === "cost" ? ((v) => "$" + nf(v)) : nf, color: "#8189a3" },
-                splitLine: { lineStyle: { color: "#f0f2f8" } } };
-  chart("trend").setOption({
-    color: PAL, tooltip: tip,
-    legend: metric === "cost" ? undefined : { bottom: 0, icon: "roundRect", itemWidth: 14, itemHeight: 8 },
-    grid: { left: 60, right: 24, top: 30, bottom: metric === "cost" ? 24 : 56 },
-    xAxis: { type: "category", data: keys, axisLabel: { color: "#8189a3" }, axisLine: { lineStyle: { color: "#e8eaf3" } } },
+  const yax = { type: "value", axisLabel: { formatter: metric === "cost" ? ((v) => "$" + nf(v)) : nf, color: MUT },
+                splitLine: { lineStyle: { color: SPLIT } } };
+  setChart("trend", {
+    tooltip: tip,
+    legend: { bottom: 0, icon: "rect", itemWidth: 12, itemHeight: 8, textStyle: { color: MUT, fontSize: 11, fontFamily: "monospace" } },
+    grid: { left: 64, right: 24, top: 24, bottom: metric === "cost" ? 28 : 52 },
+    xAxis: { type: "category", data: keys, axisLabel: { color: MUT, fontSize: 11 }, axisLine: { lineStyle: { color: LINE } } },
     yAxis: yax,
     series: metric === "cost"
-      ? [{ name: "cost", type: "line", smooth: true, symbolSize: 7,
-           lineStyle: { width: 3, color: "#0ea572" }, itemStyle: { color: "#0ea572" },
-           areaStyle: { opacity: .12, color: "#0ea572" }, data: keys.map((k) => yv(byDate[k])) }]
+      ? [{ name: "COST", type: "line", smooth: true, symbolSize: 6,
+           lineStyle: { width: 2, color: ACC }, itemStyle: { color: ACC },
+           areaStyle: { opacity: .15, color: ACC }, data: keys.map((k) => yv(byDate[k])) }]
       : [
-          { name: "input", type: "bar", stack: "t", barMaxWidth: 36, data: keys.map((k) => byDate[k].input) },
-          { name: "output", type: "bar", stack: "t", barMaxWidth: 36, data: keys.map((k) => byDate[k].output) },
-          { name: "cache", type: "bar", stack: "t", barMaxWidth: 36, itemStyle: { borderRadius: [6, 6, 0, 0] },
+          { name: "input", type: "bar", stack: "t", barMaxWidth: 34, barCategoryGap: "25%", itemStyle: { color: "#22d3ee" }, data: keys.map((k) => byDate[k].input) },
+          { name: "output", type: "bar", stack: "t", barMaxWidth: 34, itemStyle: { color: "#4ade80" }, data: keys.map((k) => byDate[k].output) },
+          { name: "cache", type: "bar", stack: "t", barMaxWidth: 34, itemStyle: { color: "#e879f9", borderRadius: [3, 3, 0, 0] },
             data: keys.map((k) => byDate[k].cacheRead + byDate[k].cacheWrite) },
         ],
-  }, true);
+  });
 }
 
 function renderModels(byModel) {
-  const entries = Object.entries(byModel).sort((a, b) => b[1].total - a[1].total);
-  chart("c1a").setOption({
-    color: PAL,
-    tooltip: { trigger: "item", backgroundColor: "#fff", borderColor: "#e8eaf3", textStyle: { color: "#1e2235", fontSize: 12 },
-               formatter: (p) => p.name + "<br/>" + nf(p.value) + " (" + p.percent + "%)" },
-    legend: { bottom: 0, icon: "circle", itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11, color: "#8189a3" } },
-    series: [{ type: "pie", radius: ["42%", "68%"], center: ["50%", "44%"],
-               label: { formatter: "{d}%", fontSize: 11, color: "#8189a3" },
-               itemStyle: { borderColor: "#fff", borderWidth: 2 },
-               data: entries.map(([m, a]) => ({ name: trunc(m), value: a.total })) }],
-  }, true);
+  // 零用量的模型不进构成条与排行图，避免噪音（明细表保留完整列表）
+  const entries = Object.entries(byModel).sort((a, b) => b[1].total - a[1].total).filter(([, a]) => a.total > 0);
+  const total = entries.reduce((s, [, a]) => s + a.total, 0);
+  $("dist").innerHTML = entries.map(([m, a], i) => {
+    const c = PAL[i % PAL.length];
+    return '<div class="strip"><span class="rk">' + pad(i + 1) + '</span><span class="sw" style="background:' + c + '"></span>' +
+      '<span class="nm" title="' + m + '">' + m + '</span><span class="val">' + nf(a.total) + '</span>' +
+      '<span class="pc">' + (total ? (100 * a.total / total).toFixed(1) : "0.0") + "%</span></div>";
+  }).join("");
   const names = entries.map(([m]) => trunc(m)).reverse();
   const vals = entries.map(([, a]) => a.total).reverse();
-  chart("c1b").setOption({
-    color: ["#5b6cff"], tooltip: { ...tip, formatter: (p) => p.name + "<br/>total " + nf(p.value) },
-    grid: { left: 10, right: 80, top: 10, bottom: 10, containLabel: true },
-    xAxis: { type: "value", axisLabel: { formatter: nf, color: "#8189a3" }, splitLine: { lineStyle: { color: "#f0f2f8" } } },
-    yAxis: { type: "category", data: names, axisLabel: { color: "#1e2235", fontSize: 11 }, axisLine: { lineStyle: { color: "#e8eaf3" } } },
-    series: [{ type: "bar", barMaxWidth: 18, itemStyle: { borderRadius: [0, 6, 6, 0] },
-               label: { show: true, position: "right", formatter: (p) => nf(p.value), color: "#8189a3", fontSize: 11 },
+  const cols = entries.map((_, i) => PAL[i % PAL.length]).reverse();
+  setChart("rank", {
+    tooltip: { ...tip, trigger: "item", formatter: (p) => p.name + "<br/>" + nf(p.value) + " (" + (total ? (100 * p.value / total).toFixed(1) : 0) + "%)" },
+    grid: { left: 10, right: 92, top: 6, bottom: 6, containLabel: true },
+    xAxis: { type: "value", axisLabel: { formatter: nf, color: DIM }, splitLine: { lineStyle: { color: SPLIT } } },
+    yAxis: { type: "category", data: names, axisLabel: { color: "#dcdcdc", fontSize: 11 }, axisLine: { lineStyle: { color: LINE } }, axisTick: { show: false } },
+    series: [{ type: "bar", barMaxWidth: 14, barCategoryGap: "35%",
+               itemStyle: { borderRadius: [0, 3, 3, 0], color: (p) => cols[p.dataIndex] },
+               label: { show: true, position: "right", formatter: (p) => nf(p.value), color: MUT, fontSize: 11 },
                data: vals }],
-  }, true);
+  }, Math.max(200, entries.length * 30 + 30));
 }
 
 function renderProjects(byProject) {
-  const entries = Object.entries(byProject).sort((a, b) => a[1].total - b[1].total);
-  chart("c3").setOption({
-    color: ["#5b6cff"], tooltip: { ...tip, formatter: (p) => p.name + "<br/>total " + nf(p.value) },
-    grid: { left: 60, right: 70, top: 16, bottom: 24 },
-    xAxis: { type: "value", axisLabel: { formatter: nf, color: "#8189a3" }, splitLine: { lineStyle: { color: "#f0f2f8" } } },
-    yAxis: { type: "category", data: entries.map(([p]) => trunc(p)), axisLabel: { color: "#1e2235", fontSize: 12 },
-             axisLine: { lineStyle: { color: "#e8eaf3" } } },
-    series: [{ type: "bar", barMaxWidth: 22, itemStyle: { borderRadius: [0, 6, 6, 0] },
-               label: { show: true, position: "right", formatter: (p) => nf(p.value), color: "#8189a3", fontSize: 11 },
-               data: entries.map(([, a]) => a.total) }],
-  }, true);
+  const entries = Object.entries(byProject).sort((a, b) => b[1].total - a[1].total);
+  const names = entries.map(([p]) => trunc(p)).reverse();
+  const vals = entries.map(([, a]) => a.total).reverse();
+  setChart("c3", {
+    tooltip: { ...tip, trigger: "item", formatter: (p) => p.name + "<br/>" + nf(p.value) },
+    grid: { left: 10, right: 92, top: 6, bottom: 6, containLabel: true },
+    xAxis: { type: "value", axisLabel: { formatter: nf, color: DIM }, splitLine: { lineStyle: { color: SPLIT } } },
+    yAxis: { type: "category", data: names, axisLabel: { color: "#dcdcdc", fontSize: 11 }, axisLine: { lineStyle: { color: LINE } }, axisTick: { show: false } },
+    series: [{ type: "bar", barMaxWidth: 14, barCategoryGap: "35%",
+               itemStyle: { borderRadius: [0, 3, 3, 0], color: "#a78bfa" },
+               label: { show: true, position: "right", formatter: (p) => nf(p.value), color: MUT, fontSize: 11 },
+               data: vals }],
+  }, Math.max(200, entries.length * 30 + 30));
 }
 
 function renderTable(byModel) {
-  const entries = Object.entries(byModel);
-  const row = (m, a, cls) =>
-    \`<tr\${cls ? ' class="' + cls + '"' : ""}><td>\${m ? '<span class="pill">' + m + "</span>" : "TOTAL"}</td>\` +
-    \`<td>\${a.requests}</td><td>\${a.input.toLocaleString()}</td><td>\${a.output.toLocaleString()}</td>\` +
-    \`<td>\${a.reasoning.toLocaleString()}</td><td>\${a.cacheRead.toLocaleString()}</td><td>\${a.cacheWrite.toLocaleString()}</td>\` +
-    \`<td><b>\${a.total.toLocaleString()}</b></td><td>\${money(a.cost)}</td>\` +
-    \`<td>\${a.total ? (100 * a.input / a.total).toFixed(1) : 0}%</td><td>\${a.total ? (100 * a.output / a.total).toFixed(1) : 0}%</td></tr>\`;
+  const entries = Object.entries(byModel).sort((a, b) => b[1].total - a[1].total);
+  const row = (m, a, cls, color) =>
+    "<tr" + (cls ? ' class="' + cls + '"' : "") + "><td>" +
+    (m ? '<span class="mdot" style="background:' + color + '"></span>' + m : "TOTAL") + "</td>" +
+    "<td>" + a.requests + "</td><td>" + a.input.toLocaleString() + "</td><td>" + a.output.toLocaleString() + "</td>" +
+    "<td>" + a.reasoning.toLocaleString() + "</td><td>" + a.cacheRead.toLocaleString() + "</td><td>" + a.cacheWrite.toLocaleString() + "</td>" +
+    "<td><b>" + a.total.toLocaleString() + "</b></td><td>" + money(a.cost) + "</td>" +
+    "<td>" + (a.total ? (100 * a.input / a.total).toFixed(1) : 0) + "%</td><td>" + (a.total ? (100 * a.output / a.total).toFixed(1) : 0) + "%</td></tr>";
   const t = emptyT(); entries.forEach(([, a]) => addAcc(t, a));
   $("tbl").innerHTML =
     "<thead><tr><th>模型</th><th>次数</th><th>input</th><th>output</th><th>reasoning</th><th>cache read</th><th>cache write</th><th>合计</th><th>cost</th><th>input%</th><th>output%</th></tr></thead><tbody>" +
-    entries.map(([m, a]) => row(m, a)).join("") + row(null, t, "totalrow") + "</tbody>";
+    entries.map(([m, a], i) => row(m, a, "", PAL[i % PAL.length])).join("") + row(null, t, "total") + "</tbody>";
 }
 
 function refresh() {
-  const rs = R.filter((r) => inRange(r.time, range));
+  const rs = R.filter((r) => inRange(r.time));
   const { t, byModel, byDate, byProject } = agg(rs);
   $("empty").style.display = rs.length ? "none" : "block";
-  renderCards(t);
+  renderStats(t);
   renderTrend(byDate);
   renderModels(byModel);
   renderProjects(byProject);
   renderTable(byModel);
 }
 
+/* ---- 时间筛选：快捷区间 + 自定义日历 ---- */
+function syncInputs() {
+  $("dFrom").value = from === null ? "" : fmtD(from);
+  $("dTo").value = to === null ? "" : fmtD(to);
+}
+function autoGran() {
+  if (from === null || to === null) { gran = "month"; }
+  else { const days = (to - from) / 864e5; gran = days > 730 ? "year" : days > 62 ? "month" : "day"; }
+  $("segGran").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.g === gran));
+}
+function markChips() {
+  document.querySelectorAll("#segRange .chip").forEach((b) => {
+    const [f, t] = presetSpan(b.dataset.q);
+    const on = b.dataset.q === "all" ? (from === null && to === null) : (f === from && t === to);
+    b.classList.toggle("on", on);
+  });
+}
+function applySpan(f, t) {
+  if (f !== null && t !== null && f > t) { const x = f; f = t; t = x; }
+  from = f; to = t;
+  autoGran(); syncInputs(); markChips(); closeCal(); refresh();
+}
+function setPreset(q) {
+  if (q === "all") { applySpan(null, null); return; }
+  const [f, t] = presetSpan(q);
+  applySpan(f, t);
+}
 function bindSeg(id, attr, fn) {
   $(id).addEventListener("click", (e) => {
     const btn = e.target.closest("button");
@@ -396,35 +473,64 @@ function bindSeg(id, attr, fn) {
     fn(btn.dataset[attr]);
   });
 }
-bindSeg("segRange", "r", (v) => {
-  range = v;
-  const box = $("customBox");
-  if (v === "custom") {
-    box.classList.add("show");
-    if (!$("dFrom").value && S.range.from) $("dFrom").value = S.range.from;
-    if (!$("dTo").value) { const d = new Date(); $("dTo").value = bucket(d.getTime(), "day"); }
-    applyCustom(); // 有预填值时立即生效
-  } else {
-    box.classList.remove("show");
-    gran = RANGE_GRAN[v];
-    $("segGran").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.g === gran));
-    refresh();
-  }
-});
-$("applyCustom").addEventListener("click", applyCustom);
-function applyCustom() {
-  customFrom = $("dFrom").value ? new Date($("dFrom").value + "T00:00:00").getTime() : null;
-  customTo = $("dTo").value ? new Date($("dTo").value + "T23:59:59.999").getTime() : null;
-  if (customFrom !== null && customTo !== null && customFrom > customTo) { [customFrom, customTo] = [customTo, customFrom]; }
-  const days = (customFrom !== null && customTo !== null) ? (customTo - customFrom) / 864e5 : 0;
-  gran = days > 730 ? "year" : days > 62 ? "month" : "day";
-  $("segGran").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.g === gran));
-  refresh();
-}
+bindSeg("segRange", "q", setPreset);
 bindSeg("segGran", "g", (v) => { gran = v; refresh(); });
 bindSeg("segMetric", "m", (v) => { metric = v; refresh(); });
+function applyCustom() {
+  const f = $("dFrom").value ? new Date($("dFrom").value + "T00:00:00").getTime() : null;
+  const t = $("dTo").value ? new Date($("dTo").value + "T23:59:59.999").getTime() : null;
+  applySpan(f, t);
+}
+$("applyCustom").addEventListener("click", applyCustom);
+["dFrom", "dTo"].forEach((id) => {
+  $(id).addEventListener("change", applyCustom);
+  $(id).addEventListener("focus", () => openCal(id));
+});
+/* 日历面板 */
+let calFor = null, calY = 0, calM = 0;
+function openCal(which) {
+  calFor = which;
+  const base = which === "dFrom" ? (from ?? Date.now()) : (to ?? Date.now());
+  const d = new Date(base);
+  calY = d.getFullYear(); calM = d.getMonth();
+  $("calPanel").classList.add("show");
+  renderCal();
+}
+function closeCal() { $("calPanel").classList.remove("show"); }
+function renderCal() {
+  $("calTitle").textContent = calY + " 年 " + pad(calM + 1) + " 月";
+  const first = new Date(calY, calM, 1);
+  const startWd = (first.getDay() + 6) % 7; // 周一为一周开始
+  const daysIn = new Date(calY, calM + 1, 0).getDate();
+  const today = fmtD(Date.now());
+  let html = "";
+  for (let i = 0; i < startWd; i++) html += "<span></span>";
+  for (let d = 1; d <= daysIn; d++) {
+    const ts = +new Date(calY, calM, d);
+    const cls = ["day"];
+    if (fmtD(ts) === today) cls.push("mid");
+    if (from !== null && fmtD(ts) === fmtD(from)) cls.push("sel");
+    if (to !== null && fmtD(ts) === fmtD(to) && fmtD(from) !== fmtD(to)) cls.push("sel");
+    html += '<button class="' + cls.join(" ") + '" data-ts="' + ts + '">' + d + "</button>";
+  }
+  $("calGrid").innerHTML = html;
+}
+$("calGrid").addEventListener("click", (e) => {
+  const btn = e.target.closest("button.day");
+  if (!btn) return;
+  const ts = +btn.dataset.ts;
+  if (calFor === "dFrom") applySpan(ts, to);
+  else applySpan(from, ts + 864e5 - 1);
+});
+$("calPrev").addEventListener("click", () => { calM--; if (calM < 0) { calM = 11; calY--; } renderCal(); });
+$("calNext").addEventListener("click", () => { calM++; if (calM > 11) { calM = 0; calY++; } renderCal(); });
+$("calPanel").addEventListener("click", (e) => { if (e.target.closest("[data-q]")) setPreset(e.target.closest("[data-q]").dataset.q); });
+document.addEventListener("click", (e) => {
+  if (!$("calPanel").contains(e.target) && !$("datesBox").contains(e.target)) closeCal();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeCal(); });
 window.addEventListener("resize", () => Object.values(charts).forEach((c) => c.resize()));
-refresh();
+setPreset("all");
 </script></body></html>`;
 }
 

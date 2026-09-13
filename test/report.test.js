@@ -121,8 +121,9 @@ test("renderHtml 内嵌 echarts 与数据、无未替换占位符", () => {
   const html = renderHtml(s, echartsJs);
   assert.ok(html.includes("echarts"));
   assert.ok(html.includes("gpt-5.6-luna"));
-  assert.ok(html.includes('data-r="month"')); // 时间范围筛选器
-  assert.ok(html.includes('data-r="custom"') && html.includes('id="applyCustom"')); // 自定义时间区间
+  assert.ok(html.includes('data-q="lastmonth"') && html.includes('data-q="quarter"')); // 快捷时间区间
+  assert.ok(html.includes('id="dFrom"') && html.includes('id="dTo"') && html.includes('id="applyCustom"')); // 自定义时间区间
+  assert.ok(html.includes('id="calPanel"') && html.includes('id="calGrid"')); // 自建日历选区
   assert.ok(!html.includes("__DATA__"));
   assert.ok(html.startsWith("<!doctype html>"));
 });
