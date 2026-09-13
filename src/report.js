@@ -159,6 +159,12 @@ function renderHtml(summary, echartsJs) {
                 cursor: pointer; color: var(--muted); font-family: inherit; }
   .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.15); font-weight: 600; }
   .seg button.on.pri { background: var(--accent); color: #fff; }
+  #customBox { display: none; align-items: center; gap: 8px; }
+  #customBox.show { display: inline-flex; }
+  #customBox input[type="date"] { border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; font-size: 13px;
+                                   font-family: inherit; color: var(--ink); background: #fff; }
+  #customBox .applybtn { border: 0; background: var(--accent); color: #fff; padding: 6px 16px; border-radius: 999px;
+                         font-size: 13px; cursor: pointer; font-family: inherit; font-weight: 600; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
   .card { background: var(--card); border-radius: 14px; padding: 16px 18px; border: 1px solid var(--border);
           box-shadow: 0 1px 2px rgba(30,34,53,.05); transition: transform .15s, box-shadow .15s; }
@@ -194,7 +200,11 @@ function renderHtml(summary, echartsJs) {
   <div class="filterbar">
     <span class="flabel">时间范围</span>
     <span class="seg" id="segRange">
-      <button data-r="all" class="on pri">全部</button><button data-r="year">今年</button><button data-r="month">本月</button><button data-r="today">今日</button>
+      <button data-r="all" class="on pri">全部</button><button data-r="year">今年</button><button data-r="month">本月</button><button data-r="today">今日</button><button data-r="custom">自定义</button>
+    </span>
+    <span id="customBox">
+      <input type="date" id="dFrom"><span class="flabel">至</span><input type="date" id="dTo">
+      <button id="applyCustom" class="applybtn">应用</button>
     </span>
     <span class="flabel" style="margin-left:auto">趋势粒度</span>
     <span class="seg" id="segGran">
@@ -227,6 +237,7 @@ const charts = {};
 const chart = (id) => charts[id] || (charts[id] = echarts.init($(id)));
 
 let range = "all", gran = "month", metric = "token";
+let customFrom = null, customTo = null; // 自定义区间的本地时间边界（毫秒）
 const RANGE_GRAN = { all: "month", year: "month", month: "day", today: "day" };
 
 function emptyT() { return { requests: 0, input: 0, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0, total: 0, cost: 0 }; }
@@ -251,6 +262,11 @@ function bucket(ts, g) {
   return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
 }
 function inRange(ts, rg) {
+  if (rg === "custom") {
+    if (customFrom !== null && ts < customFrom) return false;
+    if (customTo !== null && ts > customTo) return false;
+    return true;
+  }
   if (rg === "all") return true;
   const d = new Date(ts), now = new Date();
   if (rg === "today") return bucket(ts, "day") === bucket(now.getTime(), "day");
@@ -380,9 +396,31 @@ function bindSeg(id, attr, fn) {
     fn(btn.dataset[attr]);
   });
 }
-bindSeg("segRange", "r", (v) => { range = v; gran = RANGE_GRAN[v];
+bindSeg("segRange", "r", (v) => {
+  range = v;
+  const box = $("customBox");
+  if (v === "custom") {
+    box.classList.add("show");
+    if (!$("dFrom").value && S.range.from) $("dFrom").value = S.range.from;
+    if (!$("dTo").value) { const d = new Date(); $("dTo").value = bucket(d.getTime(), "day"); }
+    applyCustom(); // 有预填值时立即生效
+  } else {
+    box.classList.remove("show");
+    gran = RANGE_GRAN[v];
+    $("segGran").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.g === gran));
+    refresh();
+  }
+});
+$("applyCustom").addEventListener("click", applyCustom);
+function applyCustom() {
+  customFrom = $("dFrom").value ? new Date($("dFrom").value + "T00:00:00").getTime() : null;
+  customTo = $("dTo").value ? new Date($("dTo").value + "T23:59:59.999").getTime() : null;
+  if (customFrom !== null && customTo !== null && customFrom > customTo) { [customFrom, customTo] = [customTo, customFrom]; }
+  const days = (customFrom !== null && customTo !== null) ? (customTo - customFrom) / 864e5 : 0;
+  gran = days > 730 ? "year" : days > 62 ? "month" : "day";
   $("segGran").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.g === gran));
-  refresh(); });
+  refresh();
+}
 bindSeg("segGran", "g", (v) => { gran = v; refresh(); });
 bindSeg("segMetric", "m", (v) => { metric = v; refresh(); });
 window.addEventListener("resize", () => Object.values(charts).forEach((c) => c.resize()));
@@ -423,7 +461,13 @@ function main(argv = []) {
   const outFile = opts.out || path.join(usageDir, "usage-report.html");
   const pricesFile = opts.prices || path.join(usageDir, "prices.json");
 
-  const { records, bad } = readRecords(dataFile);
+  const { records, bad } = (() => {
+    // 使用默认路径时，先静默增量同步 opencode.db 的历史用量（幂等，按 messageID 跳过已存在）
+    if (!opts.data && !opts.db) {
+      try { require("./import-history.js").main([], { quiet: true }); } catch { /* 数据库不可用时只用现有 data.jsonl */ }
+    }
+    return readRecords(dataFile);
+  })();
   const prices = loadPrices(pricesFile);
   // 每条记录预解析有效成本（价格表兜底 / override），整份嵌入 HTML 供浏览器本地筛选聚合
   const enriched = dedupe(records).map((r) => ({

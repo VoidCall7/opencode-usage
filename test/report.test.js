@@ -122,6 +122,7 @@ test("renderHtml 内嵌 echarts 与数据、无未替换占位符", () => {
   assert.ok(html.includes("echarts"));
   assert.ok(html.includes("gpt-5.6-luna"));
   assert.ok(html.includes('data-r="month"')); // 时间范围筛选器
+  assert.ok(html.includes('data-r="custom"') && html.includes('id="applyCustom"')); // 自定义时间区间
   assert.ok(!html.includes("__DATA__"));
   assert.ok(html.startsWith("<!doctype html>"));
 });
