@@ -203,7 +203,63 @@ document.getElementById("tbl").innerHTML =
 </script></body></html>`;
 }
 
+const os = require("os");
+const path = require("path");
+const { spawn } = require("child_process");
+
+function openBrowser(file) {
+  const cmd = process.platform === "win32"
+    ? spawn("cmd", ["/c", "start", "", file], { detached: true, stdio: "ignore" })
+    : process.platform === "darwin"
+      ? spawn("open", [file], { detached: true, stdio: "ignore" })
+      : spawn("xdg-open", [file], { detached: true, stdio: "ignore" });
+  cmd.unref();
+}
+// win32 注意：start 后第一个引号参数是窗口标题，必须传空字符串，否则文件名会被当标题。
+
+function parseArgs(argv) {
+  const opts = { open: false };
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--open") opts.open = true;
+    else if (argv[i] === "--data") opts.data = argv[++i];
+    else if (argv[i] === "--out") opts.out = argv[++i];
+    else if (argv[i] === "--prices") opts.prices = argv[++i];
+  }
+  return opts;
+}
+
+function main(argv = []) {
+  const home = os.homedir();
+  const usageDir = path.join(home, ".config", "opencode", "usage");
+  const opts = parseArgs(argv);
+  const dataFile = opts.data || path.join(usageDir, "data.jsonl");
+  const outFile = opts.out || path.join(usageDir, "usage-report.html");
+  const pricesFile = opts.prices || path.join(usageDir, "prices.json");
+
+  const { records, bad } = readRecords(dataFile);
+  const summary = aggregate(dedupe(records), loadPrices(pricesFile));
+  summary.bad = bad;
+
+  const text = renderText(summary);
+  console.log(text);
+
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
+  let echartsJs;
+  try {
+    echartsJs = fs.readFileSync(path.join(__dirname, "vendor", "echarts.min.js"), "utf8");
+  } catch {
+    throw new Error(`找不到 ${path.join(__dirname, "vendor", "echarts.min.js")}，请先下载 ECharts 到 src/vendor/`);
+  }
+  fs.writeFileSync(outFile, renderHtml(summary, echartsJs));
+  console.log(`\nHTML 报告: ${outFile}`);
+
+  if (opts.open) openBrowser(outFile);
+  return text;
+}
+
+if (require.main === module) main(process.argv.slice(2));
+
 module.exports = {
   readRecords, dedupe, localDate, loadPrices, estimateCost, aggregate,
-  renderText, renderHtml,
+  renderText, renderHtml, openBrowser, parseArgs, main,
 };

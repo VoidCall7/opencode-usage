@@ -113,3 +113,15 @@ test("renderHtml 内嵌 echarts 与数据、无未替换占位符", () => {
   assert.ok(!html.includes("__DATA__"));
   assert.ok(html.startsWith("<!doctype html>"));
 });
+
+test("main dry-run：读样例数据、写 HTML、stdout 输出汇总", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "usage-main-"));
+  const data = path.join(dir, "data.jsonl");
+  const out = path.join(dir, "report.html");
+  fs.writeFileSync(data, JSON.stringify(rec()) + "\n");
+  const { main } = require("../src/report.js");
+  const text = main(["--data", data, "--out", out]);
+  assert.ok(text.includes("tryaigc/gpt-5.6-luna"));
+  const html = fs.readFileSync(out, "utf8");
+  assert.ok(html.startsWith("<!doctype html>"));
+});
