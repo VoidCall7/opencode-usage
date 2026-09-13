@@ -191,13 +191,13 @@ function renderHtml(summary, echartsJs) {
   .sec-h { margin: 0 0 8px; font-size: 24px; letter-spacing: -.5px; }
   .sec-h span { color: var(--mut); font-size: 14px; font-weight: 400; margin-left: 10px; }
   .sec-d { color: var(--dim); font-size: 12px; margin: 0 0 26px; }
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px;
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(136px, 1fr)); gap: 1px;
            background: var(--line); border: 1px solid var(--line); }
   .stat { background: #111; padding: 18px 20px; }
   .stat .k { color: var(--dim); font-size: 10px; letter-spacing: 1.5px; }
   .stat .v { font-size: 22px; font-weight: 700; margin-top: 10px; font-variant-numeric: tabular-nums; }
   .stat.a .v { color: var(--acc); } .stat.g .v { color: #4ade80; } .stat.c .v { color: #22d3ee; }
-  .stat.o .v { color: #ff9f1c; } .stat.p .v { color: #e879f9; }
+  .stat.o .v { color: #ff9f1c; } .stat.p .v { color: #e879f9; } .stat.b .v { color: #60a5fa; }
   .stat .v small { font-size: 11px; font-weight: 400; color: var(--mut); }
   .strips { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px; margin-bottom: 24px; }
   .strip { display: flex; align-items: center; gap: 10px; background: #161616; border: 1px solid #222;
@@ -255,7 +255,7 @@ function renderHtml(summary, echartsJs) {
   <div id="empty">该时间范围内暂无数据</div>
   <div class="stats" id="cards"></div>
 </div></section>
-<section><div class="wrap"><h2 class="sec-h">用量趋势<span>按所选粒度聚合，TOKEN / COST 可切换</span></h2><div id="trend" style="height:340px"></div></div></section>
+<section><div class="wrap"><h2 class="sec-h">用量趋势<span>各模型用量占比堆叠（前 8 + 其他）· 点击图例隐藏模型 · TOKEN / COST 可切换</span></h2><div id="trend" style="height:340px"></div></div></section>
 <section><div class="wrap"><h2 class="sec-h">模型分布<span>构成与用量排行</span></h2>
   <div class="strips" id="dist"></div><div id="rank"></div></div></section>
 <section><div class="wrap"><h2 class="sec-h">按项目<span>各项目目录的总 token 对比</span></h2><div id="c3"></div></div></section>
@@ -315,14 +315,17 @@ function inRange(ts) {
 }
 const modelKey = (r) => (r.providerID || "") + "/" + (r.modelID || "");
 function agg(rs) {
-  const t = emptyT(), byModel = {}, byDate = {}, byProject = {};
+  const t = emptyT(), byModel = {}, byDate = {}, byProject = {}, byDateModel = {};
   for (const r of rs) {
     addT(t, r);
-    addT(byModel[modelKey(r)] = byModel[modelKey(r)] || emptyT(), r);
-    addT(byDate[bucket(r.time, gran)] = byDate[bucket(r.time, gran)] || emptyT(), r);
+    const mk = modelKey(r);
+    addT(byModel[mk] = byModel[mk] || emptyT(), r);
+    const bk = bucket(r.time, gran);
+    addT(byDate[bk] = byDate[bk] || emptyT(), r);
     addT(byProject[r.projectPath || "(unknown)"] = byProject[r.projectPath || "(unknown)"] || emptyT(), r);
+    addT((byDateModel[bk] = byDateModel[bk] || {})[mk] = byDateModel[bk][mk] || emptyT(), r);
   }
-  return { t, byModel, byDate, byProject };
+  return { t, byModel, byDate, byProject, byDateModel };
 }
 
 function renderStats(t) {
@@ -332,6 +335,7 @@ function renderStats(t) {
     ["INPUT", nf(t.input) + ' <small>' + (t.total ? (100 * t.input / t.total).toFixed(1) + "%" : "-") + "</small>", "c"],
     ["OUTPUT", nf(t.output) + ' <small>' + (t.total ? (100 * t.output / t.total).toFixed(1) + "%" : "-") + "</small>", "o"],
     ["CACHE R/W", '<small>' + nf(t.cacheRead) + " / " + nf(t.cacheWrite) + "</small>", "p"],
+    ["缓存率", (t.total ? (100 * t.cacheRead / t.total).toFixed(1) : "0.0") + "%", "b"],
     ["请求次数", String(t.requests), ""],
     ["REASONING", '<small>output 子集</small> ' + nf(t.reasoning), ""],
   ];
@@ -346,27 +350,51 @@ function setChart(id, opt, h) {
   charts[id].setOption(opt);
 }
 
-function renderTrend(byDate) {
+function renderTrend(byDate, byDateModel, byModel) {
+  // 与参考页一致：柱内按模型堆叠（占比），前 8 + 其他；颜色与构成条/排行/明细一致；点击图例可隐藏模型
   const keys = Object.keys(byDate).sort();
-  const yv = (a) => metric === "cost" ? +a.cost.toFixed(6) : a.total;
-  const yax = { type: "value", axisLabel: { formatter: metric === "cost" ? ((v) => "$" + nf(v)) : nf, color: MUT },
-                splitLine: { lineStyle: { color: SPLIT } } };
+  const ranking = Object.entries(byModel).sort((a, b) => b[1].total - a[1].total).filter(([, a]) => a.total > 0);
+  const top = ranking.slice(0, 8).map((e) => e[0]);
+  const val = (a) => metric === "cost" ? +a.cost.toFixed(6) : a.total;
+  const colorOf = (m) => { const i = ranking.findIndex((e) => e[0] === m); return PAL[i % PAL.length]; };
+  const series = top.map((m) => ({
+    name: m, type: "bar", stack: "t", barMaxWidth: 34, barCategoryGap: "25%",
+    itemStyle: { color: colorOf(m) },
+    data: keys.map((k) => val((byDateModel[k] || {})[m] || emptyT())),
+  }));
+  if (ranking.length > 8) series.push({
+    name: "其他", type: "bar", stack: "t", barMaxWidth: 34, itemStyle: { color: "#ff8904" },
+    data: keys.map((k) => { const d = byDateModel[k] || {}; let s = 0;
+      ranking.slice(8).forEach(([m]) => { s += val(d[m] || emptyT()); });
+      return +s.toFixed(6); }),
+  });
+  // 列顶当日总量标签：透明占位段（同 stack 顶部），不进 tooltip
+  series.push({
+    name: "__total", type: "bar", stack: "t", silent: true, barMaxWidth: 34, z: 1,
+    itemStyle: { color: "transparent" }, data: keys.map(() => 0), tooltip: { show: false },
+    label: { show: true, position: "top", fontSize: 10, color: MUT,
+             formatter: (p) => metric === "cost" ? money(byDate[keys[p.dataIndex]].cost) : nf(byDate[keys[p.dataIndex]].total) },
+  });
   setChart("trend", {
-    tooltip: tip,
-    legend: { bottom: 0, icon: "rect", itemWidth: 12, itemHeight: 8, textStyle: { color: MUT, fontSize: 11, fontFamily: "monospace" } },
-    grid: { left: 64, right: 24, top: 24, bottom: metric === "cost" ? 28 : 52 },
+    tooltip: { trigger: "axis", backgroundColor: "#1a1a1a", borderColor: "#333", textStyle: { color: "#eee", fontSize: 12 },
+      formatter: (ps) => {
+        const rows = ps.filter((p) => p.seriesName !== "__total" && p.value > 0).sort((a, b) => b.value - a.value);
+        let tot = 0; rows.forEach((p) => { tot += p.value; });
+        let h = ps[0].axisValue;
+        rows.forEach((p) => {
+          h += "<br/>" + p.marker + p.seriesName + "  " + (metric === "cost" ? money(p.value) : nf(p.value)) +
+               " (" + (tot ? (100 * p.value / tot).toFixed(1) : 0) + "%)";
+        });
+        return h + "<br/>合计 " + (metric === "cost" ? money(tot) : nf(tot));
+      } },
+    legend: { type: "scroll", bottom: 0, icon: "rect", itemWidth: 10, itemHeight: 8,
+              textStyle: { color: MUT, fontSize: 10, fontFamily: "monospace" },
+              data: top.concat(ranking.length > 8 ? ["其他"] : []) },
+    grid: { left: 64, right: 24, top: 28, bottom: 54 },
     xAxis: { type: "category", data: keys, axisLabel: { color: MUT, fontSize: 11 }, axisLine: { lineStyle: { color: LINE } } },
-    yAxis: yax,
-    series: metric === "cost"
-      ? [{ name: "COST", type: "line", smooth: true, symbolSize: 6,
-           lineStyle: { width: 2, color: ACC }, itemStyle: { color: ACC },
-           areaStyle: { opacity: .15, color: ACC }, data: keys.map((k) => yv(byDate[k])) }]
-      : [
-          { name: "input", type: "bar", stack: "t", barMaxWidth: 34, barCategoryGap: "25%", itemStyle: { color: "#22d3ee" }, data: keys.map((k) => byDate[k].input) },
-          { name: "output", type: "bar", stack: "t", barMaxWidth: 34, itemStyle: { color: "#4ade80" }, data: keys.map((k) => byDate[k].output) },
-          { name: "cache", type: "bar", stack: "t", barMaxWidth: 34, itemStyle: { color: "#e879f9", borderRadius: [3, 3, 0, 0] },
-            data: keys.map((k) => byDate[k].cacheRead + byDate[k].cacheWrite) },
-        ],
+    yAxis: { type: "value", axisLabel: { formatter: metric === "cost" ? ((v) => "$" + nf(v)) : nf, color: MUT },
+             splitLine: { lineStyle: { color: SPLIT } } },
+    series,
   });
 }
 
@@ -428,10 +456,10 @@ function renderTable(byModel) {
 
 function refresh() {
   const rs = R.filter((r) => inRange(r.time));
-  const { t, byModel, byDate, byProject } = agg(rs);
+  const { t, byModel, byDate, byProject, byDateModel } = agg(rs);
   $("empty").style.display = rs.length ? "none" : "block";
   renderStats(t);
-  renderTrend(byDate);
+  renderTrend(byDate, byDateModel, byModel);
   renderModels(byModel);
   renderProjects(byProject);
   renderTable(byModel);
