@@ -126,80 +126,141 @@ function renderText(summary) {
 function renderHtml(summary, echartsJs) {
   // 细分数据：reasoning 单独展示，不参与求和
   const payload = JSON.stringify(summary).replace(/</g, "\\u003c");
+  const generatedAt = new Date().toLocaleString("zh-CN", { hour12: false });
   return `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OpenCode Token 用量报告</title>
 <style>
-  body { font-family: "Microsoft YaHei", system-ui, sans-serif; margin: 24px; background: #f7f8fa; color: #222; }
-  h1 { font-size: 20px; } .cards { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
-  .card { background: #fff; border-radius: 8px; padding: 12px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-  .card b { display: block; font-size: 20px; margin-top: 4px; }
-  .chart { background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-  #c1,#c2,#c3 { width: 100%; height: 360px; }
-  table { border-collapse: collapse; width: 100%; background: #fff; font-size: 13px; }
-  th, td { border: 1px solid #e5e5e5; padding: 6px 10px; text-align: right; }
+  :root { --bg:#f3f5fb; --card:#fff; --ink:#1e2235; --muted:#8189a3; --border:#e8eaf3; --accent:#5b6cff; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; background: var(--bg); color: var(--ink); margin: 0; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 24px 40px; }
+  .hero { background: linear-gradient(130deg, #5b6cff, #8a5cff 55%, #c14bff); border-radius: 16px; color: #fff;
+          padding: 24px 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+          box-shadow: 0 10px 26px rgba(91,108,255,.28); margin-bottom: 20px; }
+  .hero h1 { margin: 0; font-size: 22px; letter-spacing: .5px; }
+  .hero .sub { opacity: .85; font-size: 13px; margin-top: 6px; }
+  .badge { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.4); padding: 6px 16px;
+           border-radius: 999px; font-size: 13px; white-space: nowrap; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .card { background: var(--card); border-radius: 14px; padding: 16px 18px; border: 1px solid var(--border);
+          box-shadow: 0 1px 2px rgba(30,34,53,.05); transition: transform .15s, box-shadow .15s; }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(30,34,53,.08); }
+  .card .label { font-size: 12px; color: var(--muted); }
+  .card .value { font-size: 22px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .card .value small { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .card.tok .value { color: var(--accent); } .card.cost .value { color: #0ea572; }
+  .card.inp .value { color: #3d7bfd; } .card.out .value { color: #e8590c; }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px 12px; margin-bottom: 20px;
+           box-shadow: 0 1px 2px rgba(30,34,53,.05); }
+  .panel h3 { margin: 0; font-size: 15px; display: flex; align-items: center; justify-content: space-between; }
+  .panel .desc { font-size: 12px; color: var(--muted); margin: 4px 0 6px; }
+  #c1,#c2,#c3 { width: 100%; height: 340px; }
+  .seg { display: inline-flex; background: #edeff8; border-radius: 999px; padding: 3px; }
+  .seg button { border: 0; background: transparent; padding: 5px 16px; border-radius: 999px; font-size: 13px;
+                cursor: pointer; color: var(--muted); font-family: inherit; }
+  .seg button.on { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.15); font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th { color: var(--muted); font-weight: 600; text-align: right; padding: 10px 12px; border-bottom: 2px solid var(--border); white-space: nowrap; }
+  td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   th:first-child, td:first-child { text-align: left; }
-  .toggle button { margin-right: 8px; padding: 4px 12px; }
+  tbody tr:hover { background: #f7f8ff; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #eef0ff; color: var(--accent); font-weight: 600; font-size: 12px; }
+  footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 4px; }
 </style></head><body>
-<h1>OpenCode Token 用量报告${summary.range.from ? `（${summary.range.from} ~ ${summary.range.to}）` : ""}</h1>
-<div class="cards" id="cards"></div>
-<div class="chart"><h3>按模型</h3><div id="c1"></div></div>
-<div class="chart"><h3>按日期 <span class="toggle"><button id="btnTok">token</button><button id="btnCost">cost</button></span></h3><div id="c2"></div></div>
-<div class="chart"><h3>按项目</h3><div id="c3"></div></div>
-<h3>明细（按模型汇总）</h3><table id="tbl"></table>
+<div class="wrap">
+  <div class="hero">
+    <div><h1>📊 OpenCode Token 用量报告</h1>
+      <div class="sub">按模型 · 按日期 · 按项目 | reasoning 为 output 子集，不计入总量</div></div>
+    <div class="badge">${summary.range.from ? `${summary.range.from} ~ ${summary.range.to}` : "暂无数据"}</div>
+  </div>
+  <div class="cards" id="cards"></div>
+  <div class="panel"><h3>按模型</h3><div class="desc">各类 token 堆叠（cache = read + write）</div><div id="c1"></div></div>
+  <div class="panel"><h3>按日期
+    <span class="seg"><button id="btnTok" class="on">token</button><button id="btnCost">cost</button></span></h3>
+    <div class="desc">每日用量趋势，可切换金额视图</div><div id="c2"></div></div>
+  <div class="panel"><h3>按项目</h3><div class="desc">各项目目录的总 token 对比</div><div id="c3"></div></div>
+  <div class="panel"><h3>明细（按模型汇总）</h3><div style="overflow-x:auto"><table id="tbl"></table></div></div>
+  <footer>生成时间 ${generatedAt} · 数据源 ~/.config/opencode/usage/data.jsonl${summary.bad > 0 ? ` · 已跳过坏行 ${summary.bad} 条` : ""}</footer>
+</div>
 <script>${echartsJs}</script>
 <script>
 const S = ${payload};
+const PAL = ["#5b6cff", "#22c1a4", "#f6a723"];
+const nf = (v) => v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e4 ? (v / 1e3).toFixed(1) + "K" : (v || 0).toLocaleString();
+const tip = { trigger: "axis", backgroundColor: "#fff", borderColor: "#e8eaf3", textStyle: { color: "#1e2235", fontSize: 12 } };
+const grid = { left: 60, right: 24, top: 40, bottom: 76 };
+const axfmt = (v) => nf(v);
+
 const cards = [
-  ["总 token", S.totals.total.toLocaleString()], ["总 cost", "$" + S.totals.cost.toFixed(4)],
-  ["input 占比", S.totals.total ? (100 * S.totals.input / S.totals.total).toFixed(1) + "%" : "-"],
-  ["output 占比", S.totals.total ? (100 * S.totals.output / S.totals.total).toFixed(1) + "%" : "-"],
-  ["请求次数", S.totals.requests],
-  ["cache 细分", "read " + S.totals.cacheRead.toLocaleString() + " / write " + S.totals.cacheWrite.toLocaleString()],
-  ["reasoning（output 子集，不计入总量）", S.totals.reasoning.toLocaleString()],
+  ["总 token", nf(S.totals.total), "tok"],
+  ["总 cost", "$" + S.totals.cost.toFixed(4), "cost"],
+  ["input 占比", S.totals.total ? (100 * S.totals.input / S.totals.total).toFixed(1) + "%" : "-", "inp"],
+  ["output 占比", S.totals.total ? (100 * S.totals.output / S.totals.total).toFixed(1) + "%" : "-", "out"],
+  ["cache read/write", '<small>' + nf(S.totals.cacheRead) + " / " + nf(S.totals.cacheWrite) + "</small>", ""],
+  ["请求次数", String(S.totals.requests), ""],
+  ["reasoning <small>(output 子集)</small>", nf(S.totals.reasoning), ""],
 ];
-document.getElementById("cards").innerHTML = cards.map(([k, v]) => \`<div class="card">\${k}<b>\${v}</b></div>\`).join("");
+document.getElementById("cards").innerHTML = cards.map(([k, v, c]) =>
+  \`<div class="card \${c}"><div class="label">\${k}</div><div class="value">\${v}</div></div>\`).join("");
+
 const chart = (id) => echarts.init(document.getElementById(id));
 const models = Object.keys(S.byModel);
 chart("c1").setOption({
-  tooltip: { trigger: "axis" }, legend: {},
-  xAxis: { type: "category", data: models, axisLabel: { interval: 0, rotate: 30 } },
-  yAxis: { type: "value" },
+  color: PAL, tooltip: tip, legend: { bottom: 0, icon: "roundRect", itemWidth: 14, itemHeight: 8 },
+  grid,
+  xAxis: { type: "category", data: models, axisLabel: { interval: 0, rotate: 24, fontSize: 11, color: "#8189a3" },
+           axisLine: { lineStyle: { color: "#e8eaf3" } } },
+  yAxis: { type: "value", axisLabel: { formatter: axfmt, color: "#8189a3" }, splitLine: { lineStyle: { color: "#f0f2f8" } } },
   series: [
-    { name: "input", type: "bar", stack: "t", data: models.map((m) => S.byModel[m].input) },
-    { name: "output", type: "bar", stack: "t", data: models.map((m) => S.byModel[m].output) },
-    { name: "cache", type: "bar", stack: "t", data: models.map((m) => S.byModel[m].cacheRead + S.byModel[m].cacheWrite) },
+    { name: "input", type: "bar", stack: "t", barMaxWidth: 46, itemStyle: { borderRadius: [0, 0, 0, 0] }, data: models.map((m) => S.byModel[m].input) },
+    { name: "output", type: "bar", stack: "t", barMaxWidth: 46, data: models.map((m) => S.byModel[m].output) },
+    { name: "cache", type: "bar", stack: "t", barMaxWidth: 46, itemStyle: { borderRadius: [6, 6, 0, 0] }, data: models.map((m) => S.byModel[m].cacheRead + S.byModel[m].cacheWrite) },
   ],
 });
+
 const dates = Object.keys(S.byDate).sort();
 const c2 = chart("c2");
 function drawDate(mode) {
   c2.setOption({
-    tooltip: { trigger: "axis" }, legend: {},
-    xAxis: { type: "category", data: dates },
-    yAxis: mode === "cost" ? { type: "value", name: "cost($)" } : { type: "value" },
+    color: PAL, tooltip: tip,
+    legend: mode === "cost" ? undefined : { bottom: 0, icon: "roundRect", itemWidth: 14, itemHeight: 8 },
+    grid,
+    xAxis: { type: "category", data: dates, axisLabel: { color: "#8189a3" }, axisLine: { lineStyle: { color: "#e8eaf3" } } },
+    yAxis: { type: "value", axisLabel: { formatter: mode === "cost" ? ((v) => "$" + nf(v)) : axfmt, color: "#8189a3" },
+             splitLine: { lineStyle: { color: "#f0f2f8" } } },
     series: mode === "cost"
-      ? [{ name: "cost", type: "line", data: dates.map((d) => +S.byDate[d].cost.toFixed(6)) }]
+      ? [{ name: "cost", type: "line", smooth: true, symbolSize: 7,
+           lineStyle: { width: 3, color: "#0ea572" }, itemStyle: { color: "#0ea572" }, areaStyle: { opacity: .12, color: "#0ea572" },
+           data: dates.map((d) => +S.byDate[d].cost.toFixed(6)) }]
       : [
-          { name: "input", type: "bar", stack: "t", data: dates.map((d) => S.byDate[d].input) },
-          { name: "output", type: "bar", stack: "t", data: dates.map((d) => S.byDate[d].output) },
-          { name: "cache", type: "bar", stack: "t", data: dates.map((d) => S.byDate[d].cacheRead + S.byDate[d].cacheWrite) },
+          { name: "input", type: "bar", stack: "t", barMaxWidth: 36, data: dates.map((d) => S.byDate[d].input) },
+          { name: "output", type: "bar", stack: "t", barMaxWidth: 36, data: dates.map((d) => S.byDate[d].output) },
+          { name: "cache", type: "bar", stack: "t", barMaxWidth: 36, itemStyle: { borderRadius: [6, 6, 0, 0] }, data: dates.map((d) => S.byDate[d].cacheRead + S.byDate[d].cacheWrite) },
         ],
   }, true);
 }
-document.getElementById("btnTok").onclick = () => drawDate("token");
-document.getElementById("btnCost").onclick = () => drawDate("cost");
+const btnTok = document.getElementById("btnTok"), btnCost = document.getElementById("btnCost");
+btnTok.onclick = () => { btnTok.classList.add("on"); btnCost.classList.remove("on"); drawDate("token"); };
+btnCost.onclick = () => { btnCost.classList.add("on"); btnTok.classList.remove("on"); drawDate("cost"); };
 drawDate("token");
+
 const projects = Object.keys(S.byProject);
 chart("c3").setOption({
-  tooltip: { trigger: "axis" },
-  xAxis: { type: "value" },
-  yAxis: { type: "category", data: projects },
-  series: [{ type: "bar", data: projects.map((p) => S.byProject[p].total) }],
+  color: ["#5b6cff"], tooltip: tip, grid: { left: 60, right: 60, top: 16, bottom: 24 },
+  xAxis: { type: "value", axisLabel: { formatter: axfmt, color: "#8189a3" }, splitLine: { lineStyle: { color: "#f0f2f8" } } },
+  yAxis: { type: "category", data: projects, axisLabel: { color: "#1e2235", fontSize: 12 }, axisLine: { lineStyle: { color: "#e8eaf3" } } },
+  series: [{ type: "bar", barMaxWidth: 22, itemStyle: { borderRadius: [0, 6, 6, 0] },
+             data: projects.map((p) => S.byProject[p].total) }],
 });
+
 document.getElementById("tbl").innerHTML =
-  "<tr><th>模型</th><th>次数</th><th>input</th><th>output</th><th>reasoning</th><th>cache read</th><th>cache write</th><th>合计</th><th>cost</th><th>input%</th><th>output%</th></tr>" +
-  models.map((m) => { const a = S.byModel[m]; return \`<tr><td>\${m}</td><td>\${a.requests}</td><td>\${a.input.toLocaleString()}</td><td>\${a.output.toLocaleString()}</td><td>\${a.reasoning.toLocaleString()}</td><td>\${a.cacheRead.toLocaleString()}</td><td>\${a.cacheWrite.toLocaleString()}</td><td>\${a.total.toLocaleString()}</td><td>$\${a.cost.toFixed(4)}</td><td>\${a.total ? (100 * a.input / a.total).toFixed(1) : 0}%</td><td>\${a.total ? (100 * a.output / a.total).toFixed(1) : 0}%</td></tr>\`; }).join("");
+  "<thead><tr><th>模型</th><th>次数</th><th>input</th><th>output</th><th>reasoning</th><th>cache read</th><th>cache write</th><th>合计</th><th>cost</th><th>input%</th><th>output%</th></tr></thead><tbody>" +
+  models.map((m) => { const a = S.byModel[m];
+    return \`<tr><td><span class="pill">\${m}</span></td><td>\${a.requests}</td><td>\${a.input.toLocaleString()}</td><td>\${a.output.toLocaleString()}</td><td>\${a.reasoning.toLocaleString()}</td><td>\${a.cacheRead.toLocaleString()}</td><td>\${a.cacheWrite.toLocaleString()}</td><td><b>\${a.total.toLocaleString()}</b></td><td>$\${a.cost.toFixed(4)}</td><td>\${a.total ? (100 * a.input / a.total).toFixed(1) : 0}%</td><td>\${a.total ? (100 * a.output / a.total).toFixed(1) : 0}%</td></tr>\`; }).join("") +
+  "</tbody>";
+window.addEventListener("resize", () => { ["c1","c2","c3"].forEach((id) => chart(id).resize()); });
 </script></body></html>`;
 }
 
