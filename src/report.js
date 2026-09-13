@@ -351,27 +351,43 @@ function setChart(id, opt, h) {
   charts[id].setOption(opt);
 }
 
-/* 模型 ↔ 趋势图 交叉高亮：悬停构成条 → 图中该模型保持彩色、其余压暗成灰（对齐参考页），悬停图中分段反向点亮构成条 */
+/* 模型/列 ↔ 趋势图 交叉高亮：悬停构成条 → 该模型保持彩色其余压暗；悬停柱 → 该列保持彩色其余列压暗（对齐参考页） */
 let trendColorMap = {};
-function dimTrend(name) {
+let dimState = null; // null | {type:"model",name} | {type:"column",idx}
+function applyTrendDim() {
   if (!charts.trend) return;
   const opt = charts.trend.getOption();
   if (!opt || !opt.series) return;
   const series = opt.series.map((s) => {
     if (s.name === "__total") return s;
-    const active = !name || s.name === name;
-    const color = active ? (trendColorMap[s.name] || "#555") : "#2f2f2f";
-    return { ...s, itemStyle: { ...s.itemStyle, color } };
+    const modelActive = !dimState || dimState.type !== "model" || s.name === dimState.name;
+    const col = modelActive ? (trendColorMap[s.name] || "#555") : "#2f2f2f";
+    const data = (s.data || []).map((v, i) => {
+      const val = v && typeof v === "object" ? v.value : v;
+      const c = dimState && dimState.type === "column" && i !== dimState.idx ? "#2f2f2f" : col;
+      return { value: val, itemStyle: { color: c } };
+    });
+    return { ...s, itemStyle: { ...s.itemStyle, color: col }, data };
   });
   charts.trend.setOption({ series });
+}
+function dimTrend(name) {
+  const next = name ? { type: "model", name } : null;
+  if (JSON.stringify(dimState) === JSON.stringify(next)) return;
+  dimState = next;
+  applyTrendDim();
+}
+function dimTrendColumn(idx) {
+  const next = idx === null || idx === undefined ? null : { type: "column", idx };
+  if (JSON.stringify(dimState) === JSON.stringify(next)) return;
+  dimState = next;
+  applyTrendDim();
 }
 function markStrip(name) {
   document.querySelectorAll("#dist .strip").forEach((el) =>
     el.classList.toggle("hl", !!name && el.dataset.model === name));
 }
-function hlTrend(name, on) {
-  if (on) dimTrend(name); else dimTrend(null);
-}
+const hlTrend = dimTrend;
 
 function renderTrend(byDate, byDateModel, byModel) {
   // 与参考页一致：柱内按模型堆叠（占比），前 8 + 其他；颜色与构成条/排行/明细一致；点击图例可隐藏模型
@@ -394,11 +410,11 @@ function renderTrend(byDate, byDateModel, byModel) {
       ranking.slice(8).forEach(([m]) => { s += val(d[m] || emptyT()); });
       return +s.toFixed(6); }),
   });
-  // 列顶当日总量标签：透明占位段（同 stack 顶部），不进 tooltip
+  // 列顶当日总量标签：透明占位段（同 stack 顶部），不进 tooltip；列太多时隐藏防重叠
   series.push({
     name: "__total", type: "bar", stack: "t", silent: true, barMaxWidth: 34, z: 1,
     itemStyle: { color: "transparent" }, data: keys.map(() => 0), tooltip: { show: false },
-    label: { show: true, position: "top", fontSize: 10, color: MUT,
+    label: { show: keys.length <= 45, position: "top", fontSize: 10, color: MUT,
              formatter: (p) => metric === "cost" ? money(byDate[keys[p.dataIndex]].cost) : nf(byDate[keys[p.dataIndex]].total) },
   });
   setChart("trend", {
@@ -423,8 +439,12 @@ function renderTrend(byDate, byDateModel, byModel) {
              splitLine: { lineStyle: { color: SPLIT } } },
     series,
   });
-  charts.trend.on("mouseover", (p) => markStrip(p.seriesName));
-  charts.trend.on("globalout", () => markStrip(null));
+  charts.trend.on("mouseover", (p) => {
+    if (p.seriesName === "__total") return;
+    markStrip(p.seriesName);
+    dimTrendColumn(p.dataIndex); // 悬停列保持彩色，其余列压暗
+  });
+  charts.trend.on("globalout", () => { markStrip(null); dimTrendColumn(null); });
 }
 
 function renderModels(byModel) {
@@ -505,8 +525,9 @@ function syncInputs() {
   $("dTo").value = to === null ? "" : fmtD(to);
 }
 function autoGran() {
-  if (from === null || to === null) { gran = "month"; }
-  else { const days = (to - from) / 864e5; gran = days > 730 ? "year" : days > 62 ? "month" : "day"; }
+  // 默认按日（与参考页一致）；跨度超过两年自动切到按年，月份/年份仍可手动切换
+  if (from === null || to === null) { gran = "day"; }
+  else { const days = (to - from) / 864e5; gran = days > 730 ? "year" : "day"; }
   $("segGran").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.g === gran));
 }
 function markChips() {
