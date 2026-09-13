@@ -351,14 +351,26 @@ function setChart(id, opt, h) {
   charts[id].setOption(opt);
 }
 
-/* 模型 ↔ 趋势图 交叉高亮：悬停构成条高亮图中该模型，悬停图中分段反向点亮构成条 */
+/* 模型 ↔ 趋势图 交叉高亮：悬停构成条 → 图中该模型保持彩色、其余压暗成灰（对齐参考页），悬停图中分段反向点亮构成条 */
+let trendColorMap = {};
+function dimTrend(name) {
+  if (!charts.trend) return;
+  const opt = charts.trend.getOption();
+  if (!opt || !opt.series) return;
+  const series = opt.series.map((s) => {
+    if (s.name === "__total") return s;
+    const active = !name || s.name === name;
+    const color = active ? (trendColorMap[s.name] || "#555") : "#2f2f2f";
+    return { ...s, itemStyle: { ...s.itemStyle, color } };
+  });
+  charts.trend.setOption({ series });
+}
 function markStrip(name) {
   document.querySelectorAll("#dist .strip").forEach((el) =>
     el.classList.toggle("hl", !!name && el.dataset.model === name));
 }
 function hlTrend(name, on) {
-  if (!charts.trend) return;
-  charts.trend.dispatchAction({ type: on ? "highlight" : "downplay", seriesName: name });
+  if (on) dimTrend(name); else dimTrend(null);
 }
 
 function renderTrend(byDate, byDateModel, byModel) {
@@ -367,7 +379,10 @@ function renderTrend(byDate, byDateModel, byModel) {
   const ranking = Object.entries(byModel).sort((a, b) => b[1].total - a[1].total).filter(([, a]) => a.total > 0);
   const top = ranking.slice(0, 8).map((e) => e[0]);
   const val = (a) => metric === "cost" ? +a.cost.toFixed(6) : a.total;
-  const colorOf = (m) => { const i = ranking.findIndex((e) => e[0] === m); return PAL[i % PAL.length]; };
+  trendColorMap = {};
+  ranking.forEach(([m], i) => { trendColorMap[m] = PAL[i % PAL.length]; });
+  trendColorMap["其他"] = "#ff8904";
+  const colorOf = (m) => trendColorMap[m] || "#555";
   const series = top.map((m) => ({
     name: m, type: "bar", stack: "t", barMaxWidth: 34, barCategoryGap: "25%",
     itemStyle: { color: colorOf(m) },
