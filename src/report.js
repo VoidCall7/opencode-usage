@@ -353,35 +353,44 @@ function setChart(id, opt, h) {
 
 /* 模型/列 ↔ 趋势图 交叉高亮：悬停构成条 → 该模型保持彩色其余压暗；悬停柱 → 该列保持彩色其余列压暗（对齐参考页） */
 let trendColorMap = {};
-let dimState = null; // null | {type:"model",name} | {type:"column",idx}
+let dimState = null; // null | {type:"model",name} | {type:"column",idx} | {type:"segment",name,idx}
 function applyTrendDim() {
   if (!charts.trend) return;
   const opt = charts.trend.getOption();
   if (!opt || !opt.series) return;
   const series = opt.series.map((s) => {
     if (s.name === "__total") return s;
-    const modelActive = !dimState || dimState.type !== "model" || s.name === dimState.name;
-    const col = modelActive ? (trendColorMap[s.name] || "#555") : "#2f2f2f";
+    // 系列级底色：模型/段悬停只保留目标模型颜色；列悬停保留全部模型颜色
+    let col;
+    if (!dimState || dimState.type === "column" || (dimState.type === "segment" && s.name === dimState.name)) {
+      col = trendColorMap[s.name] || "#555";
+    } else if (dimState.type === "model" && s.name === dimState.name) {
+      col = trendColorMap[s.name] || "#555";
+    } else {
+      col = "#2f2f2f";
+    }
+    // 逐点：段悬停 = 目标模型全日期彩色 ∪ 目标列整列彩色；列悬停 = 仅该列彩色
     const data = (s.data || []).map((v, i) => {
       const val = v && typeof v === "object" ? v.value : v;
-      const c = dimState && dimState.type === "column" && i !== dimState.idx ? "#2f2f2f" : col;
+      let c = col;
+      if (dimState && dimState.type === "column" && i !== dimState.idx) c = "#2f2f2f";
+      if (dimState && dimState.type === "segment" && i !== dimState.idx && s.name !== dimState.name) c = "#2f2f2f";
       return { value: val, itemStyle: { color: c } };
     });
     return { ...s, itemStyle: { ...s.itemStyle, color: col }, data };
   });
   charts.trend.setOption({ series });
 }
-function dimTrend(name) {
-  const next = name ? { type: "model", name } : null;
+function dimState2(next) {
   if (JSON.stringify(dimState) === JSON.stringify(next)) return;
   dimState = next;
   applyTrendDim();
 }
-function dimTrendColumn(idx) {
-  const next = idx === null || idx === undefined ? null : { type: "column", idx };
-  if (JSON.stringify(dimState) === JSON.stringify(next)) return;
-  dimState = next;
-  applyTrendDim();
+function dimTrend(name) { dimState2(name ? { type: "model", name } : null); }
+function dimTrendColumn(idx) { dimState2(idx === null || idx === undefined ? null : { type: "column", idx }); }
+function dimTrendSegment(name, idx) {
+  if (name === null || idx === null || idx === undefined) dimState2(null);
+  else dimState2({ type: "segment", name, idx });
 }
 function markStrip(name) {
   document.querySelectorAll("#dist .strip").forEach((el) =>
@@ -442,9 +451,10 @@ function renderTrend(byDate, byDateModel, byModel) {
   charts.trend.on("mouseover", (p) => {
     if (p.seriesName === "__total") return;
     markStrip(p.seriesName);
-    dimTrendColumn(p.dataIndex); // 悬停列保持彩色，其余列压暗
+    // 悬停某模型的分段：该模型全日期保持彩色 + 该列整列保持彩色，其余压暗
+    dimTrendSegment(p.seriesName, p.dataIndex);
   });
-  charts.trend.on("globalout", () => { markStrip(null); dimTrendColumn(null); });
+  charts.trend.on("globalout", () => { markStrip(null); dimTrendSegment(null); });
 }
 
 function renderModels(byModel) {
