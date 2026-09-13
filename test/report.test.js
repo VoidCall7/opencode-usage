@@ -6,6 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 const {
   readRecords, dedupe, localDate, loadPrices, estimateCost, aggregate,
+  renderText, renderHtml,
 } = require("../src/report.js");
 
 function rec(overrides = {}) {
@@ -92,4 +93,23 @@ test("aggregate 空数据时 range 为 null 且不抛错", () => {
   const s = aggregate([], {});
   assert.equal(s.range.from, null);
   assert.equal(s.totals.total, 0);
+});
+
+test("renderText 含模型行、总计行与占比", () => {
+  const s = aggregate([rec()], {});
+  const text = renderText(s);
+  assert.ok(text.includes("tryaigc/gpt-5.6-luna"));
+  assert.ok(text.includes("TOTAL"));
+  assert.ok(text.includes("60.6%")); // input 100/165
+  assert.ok(text.includes("30.3%")); // output 50/165
+});
+
+test("renderHtml 内嵌 echarts 与数据、无未替换占位符", () => {
+  const echartsJs = fs.readFileSync(
+    path.join(__dirname, "..", "src", "vendor", "echarts.min.js"), "utf8");
+  const html = renderHtml(aggregate([rec()], {}), echartsJs);
+  assert.ok(html.includes("echarts"));
+  assert.ok(html.includes("gpt-5.6-luna"));
+  assert.ok(!html.includes("__DATA__"));
+  assert.ok(html.startsWith("<!doctype html>"));
 });
