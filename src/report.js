@@ -226,7 +226,7 @@ function renderHtml(summary, echartsJs) {
 <div class="hero"><div class="wrap">
   <div class="upd">[*] 已更新 ${generatedAt}</div>
   <h1>Token 用量报告<span>.</span></h1>
-  <p>本地 OpenCode 的真实 token 消耗与成本，按模型、按项目、按时间统计。reasoning 为 output 子集，不计入总量；无价格数据时成本可能为 0。</p>
+  <p>本地 OpenCode 的真实 token 消耗与成本，按模型、按项目、按时间统计。成本优先用 OpenCode 内置计费，缺失时按 models.dev 牌价估算（prices.json，可用 override 强制覆盖）；reasoning 为 output 子集，不计入总量。</p>
 </div></div>
 <div class="toolbar"><div class="tin">
   <span class="grp" id="segRange">
