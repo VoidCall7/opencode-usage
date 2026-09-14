@@ -1,6 +1,24 @@
 {
-  "name": "opencode-usage-monitor",
+  "name": "opencode-usage",
   "version": "1.0.0",
-  "private": true,
-  "description": "OpenCode token usage monitor plugin"
+  "description": "OpenCode token usage monitor: plugin + /usage command + interactive ECharts HTML report",
+  "license": "MIT",
+  "type": "commonjs",
+  "keywords": [
+    "opencode",
+    "plugin",
+    "usage",
+    "tokens",
+    "cost",
+    "report"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.18.15"
+  }
 }

@@ -1,0 +1,9 @@
+node_modules/
+package-lock.json
+bun.lock
+
+# 运行时数据：绝不提交
+data.jsonl
+usage-report.html
+prices.json
+*.bak

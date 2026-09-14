@@ -648,6 +648,7 @@ function parseArgs(argv) {
     else if (argv[i] === "--data") opts.data = argv[++i];
     else if (argv[i] === "--out") opts.out = argv[++i];
     else if (argv[i] === "--prices") opts.prices = argv[++i];
+    else if (argv[i] === "--db") opts.db = argv[++i];
   }
   return opts;
 }
@@ -661,9 +662,11 @@ function main(argv = []) {
   const pricesFile = opts.prices || path.join(usageDir, "prices.json");
 
   const { records, bad } = (() => {
-    // 使用默认路径时，先静默增量同步 opencode.db 的历史用量（幂等，按 messageID 跳过已存在）
-    if (!opts.data && !opts.db) {
-      try { require("./import-history.js").main([], { quiet: true }); } catch { /* 数据库不可用时只用现有 data.jsonl */ }
+    // 使用默认 data 路径时，先静默增量同步 opencode.db 的历史用量（幂等，按 messageID 跳过已存在）；
+    // 显式指定 --data 时不动数据库，--db 则透传给回填脚本
+    if (!opts.data) {
+      const dbArgs = opts.db ? ["--db", opts.db] : [];
+      try { require("./import-history.js").main(dbArgs, { quiet: true }); } catch { /* 数据库不可用时只用现有 data.jsonl */ }
     }
     return readRecords(dataFile);
   })();
@@ -685,7 +688,7 @@ function main(argv = []) {
   try {
     echartsJs = fs.readFileSync(path.join(__dirname, "vendor", "echarts.min.js"), "utf8");
   } catch {
-    throw new Error(`找不到 ${path.join(__dirname, "vendor", "echarts.min.js")}，请先下载 ECharts 到 src/vendor/`);
+    throw new Error(`找不到 ${path.join(__dirname, "vendor", "echarts.min.js")}，请先下载 ECharts 到 vendor/`);
   }
   fs.writeFileSync(outFile, renderHtml(summary, echartsJs));
   console.log(`\nHTML 报告: ${outFile}`);

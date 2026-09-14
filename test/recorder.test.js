@@ -1,15 +1,15 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert");
-const { recordFromMessage, UsageStore } = require("../src/recorder.js");
+const { recordFromMessage, UsageStore } = require("../plugin/usage-monitor/recorder.js");
 
 function msg(overrides = {}) {
   return {
     id: "msg_1",
     role: "assistant",
     sessionID: "ses_1",
-    providerID: "tryaigc",
-    modelID: "gpt-5.6-luna",
+    providerID: "acme",
+    modelID: "example-model",
     time: { created: 1000, completed: 2000 },
     cost: 0.5,
     tokens: { input: 100, output: 50, reasoning: 20, cache: { read: 10, write: 5 } },

@@ -1,0 +1,16 @@
+{
+  "_comment": "示例价格表：复制为 ~/.config/opencode/usage/prices.json 后按需修改。单位 USD / 每 1M tokens；key 为 providerID/modelID；override=true 时忽略 OpenCode 自带 cost，强制按牌价计算。",
+  "provider/model-id": {
+    "input": 0.15,
+    "output": 0.6,
+    "cacheRead": 0.003,
+    "cacheWrite": 0
+  },
+  "provider/another-model": {
+    "input": 4,
+    "output": 20,
+    "cacheRead": 0.4,
+    "cacheWrite": 5,
+    "override": true
+  }
+}
