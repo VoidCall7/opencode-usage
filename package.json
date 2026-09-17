@@ -1,6 +1,6 @@
 {
   "name": "opencode-usage",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "OpenCode token usage monitor: plugin + /usage command + interactive ECharts HTML report",
   "license": "MIT",
   "type": "commonjs",
